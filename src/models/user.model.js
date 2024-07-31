@@ -10,18 +10,12 @@ const userSchema = new Schema(
         email: { type: String, required: true, unique: true },
         password: { type: String, required: true, select: false },
         role: { type: String, enum: ["user", "admin"], default: "user" },
+        firstLogin: { type: Boolean, default: false },
         position: { type: String, default: "" },
         gender: { type: String, enum: ["male", "female", "other"], required: true },
     },
     { timestamps: true }
 );
-
-userSchema.pre("save", async function (next) {
-    if (!this.isModified("password")) return next();
-    const hash = await bcrypt.hash(this.password, 10);
-    this.password = hash;
-    next();
-});
 
 const User = models.User || model("User", userSchema);
 export default User;
