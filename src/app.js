@@ -10,7 +10,12 @@ const app = express();
 // middlewares --------------
 app.use(morgan("dev"));
 
-app.use(cors({ credentials: true, origin: "http://localhost:5173" }));
+app.use(
+  cors({
+    credentials: true,
+    origin: ["http://localhost:5173", "https://smart-task-management-frontend.vercel.app"],
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
