@@ -74,7 +74,11 @@ const tokenService = () => {
 // ----------------------
 const createAndSetCookies = async (res, id) => {
   try {
-    const options = { httpOnly: true, sameSite: "none", secure: true };
+    const options = {
+      httpOnly: true,
+      sameSite: getenv("NODE_ENV") !== "development" ? "none" : "lax",
+      secure: getenv("NODE_ENV") !== "development",
+    };
     const [accessToken, refreshToken] = await Promise.all([
       tokenService().getAccessToken(id),
       tokenService().getRefreshToken(id),
