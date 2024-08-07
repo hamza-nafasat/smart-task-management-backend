@@ -78,8 +78,19 @@ const firstLogin = asyncHandler(async (req, res, next) => {
 // logout user
 // -----------
 const logoutUser = asyncHandler(async (req, res, next) => {
-  res.clearCookie(getenv("ACCESS_TOKEN_NAME"));
-  res.clearCookie(getenv("REFRESH_TOKEN_NAME"));
+  const options = {
+    httpOnly: true,
+    sameSite: getenv("NODE_ENV") !== "development" ? "none" : "lax",
+    secure: getenv("NODE_ENV") !== "development",
+  };
+  res.cookie(getenv("ACCESS_TOKEN_NAME"), null, {
+    ...options,
+    maxAge: Date.now(),
+  });
+  res.cookie(getenv("REFRESH_TOKEN_NAME"), null, {
+    ...options,
+    maxAge: Date.now(),
+  });
   res.status(200).json({
     success: true,
     message: "Logged Out Successfully",
