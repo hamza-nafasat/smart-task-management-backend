@@ -2,6 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import customErrorHandler from "./middleware/errorHandler.js";
 import userRoutes from "./routes/user.routes.js";
+import taskRoutes from "./routes/task.routes.js";
 import morgan from "morgan";
 import cors from "cors";
 
@@ -25,6 +26,7 @@ app.get("/", (req, res) => res.send("Hello World!"));
 
 // add routes ---------------
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/tasks", taskRoutes);
 
 // error handler ------------
 app.use(customErrorHandler);

@@ -2,25 +2,49 @@ import User from "../models/user.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import bcrypt from "bcrypt";
 import CustomError from "../utils/customError.js";
-import { sendTokens } from "../services/tokenService.js";
+import { sendTokens, tokenService } from "../services/tokenService.js";
 import getenv from "../config/dotenv.js";
+import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import { sendMail } from "../services/nodemailer.js";
 
 // register a new user
 // -------------------
 const registerUser = asyncHandler(async (req, res, next) => {
   const { name, username, email, password, gender, position } = req.body;
+  const image = req.file;
+  if (!image) return next(new CustomError(400, "Please provide a profile image"));
   if (!name || !username || !email || !password || !gender || !position) {
     return next(new CustomError(400, "All fields are required"));
   }
+
+  // check that username and email are unique
   let [uniqueUsername, isUniqueEmail] = await Promise.all([
     User.exists({ username }),
     User.exists({ email }),
   ]);
   if (uniqueUsername) return next(new CustomError(400, "Username already exists"));
   if (isUniqueEmail) return next(new CustomError(400, "Email already exists"));
+
   // hash password and create user
   const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser = await User.create({ name, email, password: hashedPassword, gender, position, username });
+
+  // upload image on cloudinary then create user
+  const myCloud = await uploadOnCloudinary(image, "users", "image");
+  if (!myCloud?.public_id || !myCloud?.secure_url) {
+    return next(createHttpError(400, "Error While Uploading User Image on Cloudinary"));
+  }
+  const newUser = await User.create({
+    name,
+    email,
+    password: hashedPassword,
+    gender,
+    position,
+    username,
+    image: {
+      url: myCloud.secure_url,
+      public_id: myCloud.public_id,
+    },
+  });
   if (!newUser) return next(new CustomError(500, "Failed to create user"));
   await sendTokens(res, newUser, 201, "User Created Successfully");
 });
@@ -78,8 +102,9 @@ const getMyProfile = asyncHandler(async (req, res, next) => {
 // ----------------
 const updateMyProfile = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const { name, username, password, gender, position } = req.body;
-  if (!name && !username && !email && !password && !gender && !position) {
+  const file = req.file;
+  const { name, username, email, password, gender, position } = req.body;
+  if (!name && !username && !email && !password && !gender && !position && !file) {
     return next(new CustomError(400, "Please provide at least one field"));
   }
   let isUsernameExist;
@@ -96,6 +121,20 @@ const updateMyProfile = asyncHandler(async (req, res, next) => {
   if (password) user.password = hashedPassword;
   if (gender) user.gender = gender;
   if (position) user.position = position;
+  if (file) {
+    const remove = await removeFromCloudinary(user.image.public_id);
+    if (!remove) {
+      console.log("Error while removing image from cloudinary");
+    }
+    const myCloud = await uploadOnCloudinary(file, "users", "image");
+    if (!myCloud?.public_id || !myCloud?.secure_url) {
+      return next(createHttpError(400, "Error While Uploading User Image on Cloudinary"));
+    }
+    user.image = {
+      url: myCloud.secure_url,
+      public_id: myCloud.public_id,
+    };
+  }
   const updatedUser = await user.save();
   if (!updatedUser) return next(new CustomError(500, "Failed to update user"));
   res.status(200).json({
@@ -126,4 +165,76 @@ const changePassword = asyncHandler(async (req, res, next) => {
   });
 });
 
-export { registerUser, loginUser, firstLogin, logoutUser, getMyProfile, updateMyProfile, changePassword };
+// forget password
+// ---------------
+const forgetPassword = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+  if (!email) return next(new CustomError(400, "Please Provide Email"));
+  // find user
+  const user = await User.findOne({ email });
+  if (!user) return next(new CustomError(404, "Please Provide Correct Email"));
+  // send mail
+  const resetPasswordUrl = getenv("FRONTEND_URL") + "/reset-password";
+  const resetToken = await tokenService().getAccessToken(user._id);
+  const message = `Your Reset Password Link: ${resetPasswordUrl}/${resetToken}`;
+  const isMailSent = await sendMail(email, "Reset Password", message);
+  if (!isMailSent) return next(new CustomError(500, "Some Error Occurred While Sending Mail"));
+  res.status(200).json({
+    success: true,
+    message: "Reset Password url sent to your email",
+  });
+});
+
+// reset password
+// ---------------
+const resetPassword = asyncHandler(async (req, res, next) => {
+  const resetToken = req.params.resetToken;
+  const { newPassword } = req.body;
+  if (!resetToken || !newPassword) return next(new CustomError(400, "Token and New Password are required"));
+  let verifiedToken;
+  try {
+    verifiedToken = await tokenService().verifyAccessToken(resetToken);
+    if (!verifiedToken) return next(new CustomError(400, "Invalid or Expired Token"));
+  } catch (err) {
+    return next(new CustomError(400, "Invalid or Expired Token"));
+  }
+  const user = await User.findById(verifiedToken).select("+password");
+  if (!user) return next(new CustomError(404, "Invalid or Expired Token"));
+  const hashPassword = await bcrypt.hash(newPassword, 10);
+  user.password = hashPassword;
+  await user.save();
+  res.status(200).json({ success: true, message: "Password Reset Successfully" });
+});
+
+//  get all users
+// ---------------
+const getAllUsers = asyncHandler(async (req, res, next) => {
+  const users = await User.find().select("-password").populate("tasks");
+  const modifiedUsers = users.map((user) => {
+    return {
+      ...user.toObject(),
+      inProgressTasks: user.tasks.filter((task) => task.status == "in-progress").length || 0,
+      completedTasks: user.tasks.filter((task) => task.status == "completed").length || 0,
+      scheduledTasks: user.tasks.filter((task) => task.status == "pending").length || 0,
+    };
+  });
+
+  console.log("modifiedUsers", modifiedUsers);
+  res.status(200).json({
+    success: true,
+    data: modifiedUsers,
+  });
+});
+
+export {
+  registerUser,
+  loginUser,
+  firstLogin,
+  logoutUser,
+  getAllUsers,
+  getMyProfile,
+  updateMyProfile,
+  changePassword,
+  forgetPassword,
+  resetPassword,
+};

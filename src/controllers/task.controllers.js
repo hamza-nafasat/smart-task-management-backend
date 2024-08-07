@@ -1,5 +1,5 @@
-import Task from "../models/task.model";
-import asyncHandler from "../utils/asyncHandler";
+import Task from "../models/task.model.js";
+import asyncHandler from "../utils/asyncHandler.js";
 
 // create new task
 // ---------------
@@ -19,6 +19,9 @@ const createTask = asyncHandler(async (req, res, next) => {
     creator: userId,
     assignee,
   });
+
+  // add task to users tasks
+  await Task.updateMany({ _id: { $in: assignee } }, { $push: { tasks: newTask._id } });
 
   if (!newTask) return next(new CustomError(500, "Failed to create task"));
   res.status(201).json({

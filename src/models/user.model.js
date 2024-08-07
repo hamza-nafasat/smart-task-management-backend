@@ -9,6 +9,13 @@ const userSchema = new Schema(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true, select: false },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    image: {
+      type: {
+        url: String,
+        public_id: String,
+      },
+    },
+    tasks: [{ type: Schema.Types.ObjectId, ref: "Task" }],
     firstLogin: { type: Boolean, default: false },
     position: { type: String, default: "" },
     gender: { type: String, enum: ["male", "female", "other"], required: true },
