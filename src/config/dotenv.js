@@ -6,6 +6,7 @@ const _config = Object.freeze({
   PORT: process.env.PORT,
   MONGO_URI: process.env.MONGO_URI,
   DB_NAME: process.env.DB_NAME,
+  NODE_ENV: process.env.NODE_ENV,
   FRONTEND_URL: process.env.FRONTEND_URL,
 
   // access and refresh token variables
