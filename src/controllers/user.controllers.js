@@ -76,7 +76,11 @@ const getAllUsers = asyncHandler(async (req, res, next) => {
 // delete user
 // -----------
 const deleteUser = asyncHandler(async (req, res, next) => {
+  const myId = req.user._id;
   const userId = req.params.userId;
+  if (String(userId) === String(myId)) {
+    return next(new CustomError(400, "You can't delete yourself"));
+  }
   const deletedUser = await User.findByIdAndDelete(userId);
   if (!deletedUser) return next(new CustomError(404, "User not found"));
   res.status(200).json({
