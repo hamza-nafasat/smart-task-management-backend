@@ -46,7 +46,90 @@ const registerUser = asyncHandler(async (req, res, next) => {
     },
   });
   if (!newUser) return next(new CustomError(500, "Failed to create user"));
-  await sendTokens(res, newUser, 201, "User Created Successfully");
+  res.status(201).json({
+    success: true,
+    message: "User created successfully",
+  });
+});
+
+//  get all users
+// ---------------
+const getAllUsers = asyncHandler(async (req, res, next) => {
+  const users = await User.find().select("-password").populate("tasks");
+  const modifiedUsers = users.map((user) => {
+    return {
+      ...user.toObject(),
+      inProgressTasks: user.tasks.filter((task) => task.status == "in-progress").length || 0,
+      completedTasks: user.tasks.filter((task) => task.status == "completed").length || 0,
+      scheduledTasks: user.tasks.filter((task) => task.status == "pending").length || 0,
+    };
+  });
+
+  console.log("modifiedUsers", modifiedUsers);
+  res.status(200).json({
+    success: true,
+    data: modifiedUsers,
+  });
+});
+
+// delete user
+// -----------
+const deleteUser = asyncHandler(async (req, res, next) => {
+  const userId = req.params.userId;
+  const deletedUser = await User.findByIdAndDelete(userId);
+  if (!deletedUser) return next(new CustomError(404, "User not found"));
+  res.status(200).json({
+    success: true,
+    message: "User deleted successfully",
+  });
+});
+
+// Edit user
+// ----------------
+const editUser = asyncHandler(async (req, res, next) => {
+  const userId = req.params.userId;
+  const file = req.file;
+  const { name, username, email, password, gender, position, role } = req.body;
+  if (!name && !username && !email && !password && !gender && !position && !file && !role) {
+    return next(new CustomError(400, "Please provide at least one field"));
+  }
+  let isUsernameExist;
+  let isEmailExist;
+  let hashedPassword;
+  if (username) isUsernameExist = await User.exists({ username });
+  if (email) isEmailExist = await User.exists({ email });
+  if (isEmailExist) return next(new CustomError(400, "Please Enter a Unique Email"));
+  if (isUsernameExist) return next(new CustomError(400, "Please Enter a Unique Username"));
+  if (password) hashedPassword = await bcrypt.hash(password, 10);
+  // find the user and update fields
+  const user = await User.findById(userId).select("+password");
+  if (!user) return next(new CustomError(404, "User not found"));
+  if (name) user.name = name;
+  if (username) user.username = username;
+  if (password) user.password = hashedPassword;
+  if (gender) user.gender = gender;
+  if (position) user.position = position;
+  if (role) user.role = role;
+  if (file) {
+    const remove = await removeFromCloudinary(user.image.public_id);
+    if (!remove) {
+      console.log("Error while removing image from cloudinary");
+    }
+    const myCloud = await uploadOnCloudinary(file, "users", "image");
+    if (!myCloud?.public_id || !myCloud?.secure_url) {
+      return next(createHttpError(400, "Error While Uploading User Image on Cloudinary"));
+    }
+    user.image = {
+      url: myCloud.secure_url,
+      public_id: myCloud.public_id,
+    };
+  }
+  const updatedUser = await user.save();
+  if (!updatedUser) return next(new CustomError(500, "Failed to update user"));
+  res.status(200).json({
+    success: true,
+    data: updatedUser,
+  });
 });
 
 // login user
@@ -123,6 +206,8 @@ const updateMyProfile = asyncHandler(async (req, res, next) => {
   let hashedPassword;
   if (username) isUsernameExist = await User.exists({ username });
   if (isUsernameExist) return next(new CustomError(400, "Please Enter a Unique Username"));
+  if (email) isEmailExist = await User.exists({ email });
+  if (isEmailExist) return next(new CustomError(400, "Please Enter a Unique Email"));
   if (password) hashedPassword = await bcrypt.hash(password, 10);
   // find the user and update fields
   const user = await User.findById(userId).select("+password");
@@ -217,28 +302,10 @@ const resetPassword = asyncHandler(async (req, res, next) => {
   res.status(200).json({ success: true, message: "Password Reset Successfully" });
 });
 
-//  get all users
-// ---------------
-const getAllUsers = asyncHandler(async (req, res, next) => {
-  const users = await User.find().select("-password").populate("tasks");
-  const modifiedUsers = users.map((user) => {
-    return {
-      ...user.toObject(),
-      inProgressTasks: user.tasks.filter((task) => task.status == "in-progress").length || 0,
-      completedTasks: user.tasks.filter((task) => task.status == "completed").length || 0,
-      scheduledTasks: user.tasks.filter((task) => task.status == "pending").length || 0,
-    };
-  });
-
-  console.log("modifiedUsers", modifiedUsers);
-  res.status(200).json({
-    success: true,
-    data: modifiedUsers,
-  });
-});
-
 export {
   registerUser,
+  deleteUser,
+  editUser,
   loginUser,
   firstLogin,
   logoutUser,

@@ -1,6 +1,8 @@
 import express from "express";
 import {
   changePassword,
+  deleteUser,
+  editUser,
   firstLogin,
   forgetPassword,
   getAllUsers,
@@ -11,7 +13,7 @@ import {
   resetPassword,
   updateMyProfile,
 } from "../controllers/user.controllers.js";
-import { isAuthenticated } from "../middleware/auth.js";
+import { isAdmin, isAuthenticated } from "../middleware/auth.js";
 import { singleUpload } from "../middleware/multer.js";
 
 const app = express();
@@ -20,8 +22,6 @@ const app = express();
 app.post("/create", singleUpload, registerUser);
 app.post("/login", loginUser);
 app.get("/logout", isAuthenticated, logoutUser);
-
-app.get("/all-users", isAuthenticated, getAllUsers);
 
 // forget reset password
 app.post("/forget-password", forgetPassword);
@@ -36,4 +36,12 @@ app
   .route("/my-profile")
   .get(isAuthenticated, getMyProfile)
   .put(isAuthenticated, singleUpload, updateMyProfile);
+
+// only admin routes
+app.get("/all-users", isAuthenticated, isAdmin, getAllUsers);
+app
+  .route("/single/:userId")
+  .put(isAuthenticated, isAdmin, singleUpload, editUser)
+  .delete(isAuthenticated, isAdmin, deleteUser);
+
 export default app;

@@ -18,6 +18,7 @@ const userSchema = new Schema(
     tasks: [{ type: Schema.Types.ObjectId, ref: "Task" }],
     firstLogin: { type: Boolean, default: false },
     position: { type: String, default: "" },
+    ratting: { type: Number, default: 0 },
     gender: { type: String, enum: ["male", "female", "other"], required: true },
   },
   { timestamps: true }
