@@ -1,3 +1,4 @@
+import { isValidObjectId } from "mongoose";
 import Task from "../models/task.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 
@@ -89,6 +90,29 @@ const getAllTasks = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     data: tasks,
+  });
+});
+
+// send feedBack to task assignee
+// ------------------------------
+const sendFeedBackToAssignee = asyncHandler(async (req, res, next) => {
+  const { taskId, userId, feedback } = req.body;
+  if (!isValidObjectId(taskId) || !isValidObjectId(userId))
+    return next(new CustomError(400, "Invalid TaskId or UserId"));
+  if (!feedback) return next(new CustomError(400, "Feedback is required"));
+
+  const [task, assignee] = await Promise.all([Task.findById(taskId), User.findById(userId)]);
+  if (!task) return next(new CustomError(404, "Task not found"));
+  if (!assignee) return next(new CustomError(404, "Assignee not found"));
+  const isUserExistInAssignee = task.assignee.Some((id) => String(id) === String(userId));
+  if (!isUserExistInAssignee) return next(new CustomError(400, "User is not assigned to this task"));
+  // add feedback in assignee modal
+  assignee.rattingAsAssignee.push(feedback);
+  await assignee.save();
+  if (!updatedTask) return next(new CustomError(500, "Failed to send feedback"));
+  res.status(200).json({
+    success: true,
+    data: `Feedback sent successfully to assignee ${assignee.name}`,
   });
 });
 

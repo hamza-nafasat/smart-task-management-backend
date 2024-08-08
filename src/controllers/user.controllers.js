@@ -6,6 +6,7 @@ import { sendTokens, tokenService } from "../services/tokenService.js";
 import getenv from "../config/dotenv.js";
 import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { sendMail } from "../services/nodemailer.js";
+import mongoose, { isValidObjectId, Schema } from "mongoose";
 
 // register a new user
 // -------------------
@@ -81,6 +82,7 @@ const deleteUser = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: "User deleted successfully",
+    objectId,
   });
 });
 
