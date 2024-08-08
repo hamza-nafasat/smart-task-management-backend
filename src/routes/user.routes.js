@@ -7,6 +7,7 @@ import {
   forgetPassword,
   getAllUsers,
   getMyProfile,
+  getSingleUser,
   loginUser,
   logoutUser,
   registerUser,
@@ -41,6 +42,7 @@ app
 app.get("/all-users", isAuthenticated, isAdmin, getAllUsers);
 app
   .route("/single/:userId")
+  .get(isAuthenticated, isAdmin, getSingleUser)
   .put(isAuthenticated, isAdmin, singleUpload, editUser)
   .delete(isAuthenticated, isAdmin, deleteUser);
 

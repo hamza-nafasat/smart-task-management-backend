@@ -82,7 +82,6 @@ const deleteUser = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: "User deleted successfully",
-    objectId,
   });
 });
 
@@ -131,6 +130,19 @@ const editUser = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     data: updatedUser,
+    message: "User updated successfully",
+  });
+});
+
+// get Single user
+// ----------------
+const getSingleUser = asyncHandler(async (req, res, next) => {
+  const userId = req.params.userId;
+  const user = await User.findById(userId).select("-password");
+  if (!user) return next(new CustomError(404, "User not found"));
+  res.status(200).json({
+    success: true,
+    data: user,
   });
 });
 
@@ -308,6 +320,7 @@ export {
   registerUser,
   deleteUser,
   editUser,
+  getSingleUser,
   loginUser,
   firstLogin,
   logoutUser,
