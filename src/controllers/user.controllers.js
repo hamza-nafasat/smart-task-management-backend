@@ -66,7 +66,6 @@ const getAllUsers = asyncHandler(async (req, res, next) => {
     };
   });
 
-  console.log("modifiedUsers", modifiedUsers);
   res.status(200).json({
     success: true,
     data: modifiedUsers,
