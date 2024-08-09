@@ -167,7 +167,11 @@ const loginUser = asyncHandler(async (req, res, next) => {
 // ----------------
 const firstLogin = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const updatedUser = User.findByIdAndUpdate(userId, { firstLogin: false }, { new: true });
+  const user = await User.findById(userId);
+  if (!user) return next(new CustomError(404, "User not found"));
+  user.firstLogin = false;
+  const updatedUser = await user.save();
+  console.log("update user", updatedUser);
   if (!updatedUser) return next(new CustomError(500, "Failed to update user"));
   res.status(200).json({
     success: true,
