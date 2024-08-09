@@ -264,6 +264,7 @@ const updateMyProfile = asyncHandler(async (req, res, next) => {
   if (!updatedUser) return next(new CustomError(500, "Failed to update user"));
   res.status(200).json({
     success: true,
+    message: "Profile Updated SuccessFully",
     data: updatedUser,
   });
 });
