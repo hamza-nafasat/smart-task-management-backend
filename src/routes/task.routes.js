@@ -22,7 +22,7 @@ import {
 const app = express();
 
 // create get update and delete task
-app.post("/create", createTask);
+app.post("/create", isAuthenticated, createTask);
 app
   .route("/single/:taskId", isAuthenticated)
   .get(getSingleTask)

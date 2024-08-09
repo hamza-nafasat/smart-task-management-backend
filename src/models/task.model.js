@@ -9,6 +9,14 @@ const taskSchema = new Schema(
     status: { type: String, enum: ["in-progress", "completed", "scheduled"], default: "in-progress" },
     creator: { type: Schema.Types.ObjectId, ref: "User", required: true },
     assignee: { type: [Schema.Types.ObjectId], ref: "User" },
+    attachments: {
+      type: [
+        {
+          public_id: String,
+          url: String,
+        },
+      ],
+    },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
   },

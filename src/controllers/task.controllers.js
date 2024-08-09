@@ -1,12 +1,13 @@
 import { isValidObjectId } from "mongoose";
 import Task from "../models/task.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import CustomError from "../utils/customError.js";
 
 // create new task
 // ---------------
 const createTask = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const { title, description, startDate, endDate, assignee = [] } = req.body;
+  const { title, description, startDate, endDate, assignee = [], attachments = [] } = req.body;
 
   if (!title || !description || !startDate || !endDate)
     return next(new CustomError(400, "All fields are required"));
@@ -85,7 +86,9 @@ const deleteSingleTask = asyncHandler(async (req, res, next) => {
 // -------------
 const getAllTasks = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const tasks = await Task.find({ creator: userId });
+  const tasks = await Task.find({ $or: [{ creator: userId }, { assignee: userId }] }).populate(
+    "creator assignee"
+  );
   if (!tasks) return next(new CustomError(404, "No tasks found"));
   res.status(200).json({
     success: true,
