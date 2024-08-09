@@ -167,7 +167,7 @@ const loginUser = asyncHandler(async (req, res, next) => {
 // ----------------
 const firstLogin = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const updatedUser = User.findByIdAndUpdate(userId, { firstLogin: true }, { new: true });
+  const updatedUser = User.findByIdAndUpdate(userId, { firstLogin: false }, { new: true });
   if (!updatedUser) return next(new CustomError(500, "Failed to update user"));
   res.status(200).json({
     success: true,
