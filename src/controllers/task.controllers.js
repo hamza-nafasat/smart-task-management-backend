@@ -60,7 +60,7 @@ const createTask = asyncHandler(async (req, res, next) => {
   await Task.updateMany({ _id: { $in: assignee } }, { $push: { tasks: newTask._id } });
   res.status(201).json({
     success: true,
-    data: "Task created successfully",
+    message: "Task created successfully",
   });
 });
 

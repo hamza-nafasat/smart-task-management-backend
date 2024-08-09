@@ -38,8 +38,8 @@ app
   .get(isAuthenticated, getMyProfile)
   .put(isAuthenticated, singleUpload, updateMyProfile);
 
+app.get("/all-users", isAuthenticated, getAllUsers);
 // only admin routes
-app.get("/all-users", isAuthenticated, isAdmin, getAllUsers);
 app
   .route("/single/:userId")
   .get(isAuthenticated, isAdmin, getSingleUser)

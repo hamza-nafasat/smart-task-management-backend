@@ -19,7 +19,7 @@ const taskSchema = new Schema(
     },
     onDay: {
       type: String,
-      enum: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+      enum: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
       default: null,
     },
     startDate: { type: Date, default: null },
