@@ -81,9 +81,13 @@ const deleteUser = asyncHandler(async (req, res, next) => {
     return next(new CustomError(400, "You can't delete yourself"));
   }
   const user = await User.findById(userId);
-  if (String(user._id === String("66b4bbff049ce7259b05fa75")))
-    return next(new CustomError(400, "You can't delete a Papi Developer"));
   if (!user) return next(new CustomError(404, "User not found"));
+  if (String(user._id) === "66b4bbff049ce7259b05fa75") {
+    return next(new CustomError(400, "Don't delete Me I Am Working On Backend"));
+  }
+  if (String(user._id == "66b5c37dd27be1d293b82d6c")) {
+    return next(new CustomError(400, "Don't delete Me I Am Working On Frontend"));
+  }
   const deletedUser = await User.findByIdAndDelete(userId);
   if (!deletedUser) return next(new CustomError(404, "User not found"));
   res.status(200).json({
