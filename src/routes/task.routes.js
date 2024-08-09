@@ -18,11 +18,12 @@ import {
   updateComment,
   updateCommentReply,
 } from "../controllers/notification.controllers.js";
+import { multipleUpload } from "../middleware/multer.js";
 
 const app = express();
 
 // create get update and delete task
-app.post("/create", isAuthenticated, createTask);
+app.post("/create", multipleUpload, isAuthenticated, createTask);
 app
   .route("/single/:taskId", isAuthenticated)
   .get(getSingleTask)

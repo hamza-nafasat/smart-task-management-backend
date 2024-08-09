@@ -2,30 +2,62 @@ import { isValidObjectId } from "mongoose";
 import Task from "../models/task.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import CustomError from "../utils/customError.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 // create new task
 // ---------------
 const createTask = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const { title, description, startDate, endDate, assignee = [], attachments = [] } = req.body;
+  let { title, description, startDate, endDate, assignee = [], onDay, status } = req.body;
+  const attachments = req.files;
+  assignee = new Set(assignee.split(","));
+  assignee = [...assignee];
 
-  if (!title || !description || !startDate || !endDate)
-    return next(new CustomError(400, "All fields are required"));
+  if (!title) return next(new CustomError(400, "Title is required"));
+  if (!description) return next(new CustomError(400, "Description is required"));
+  if (!onDay && !startDate && !endDate) {
+    return next(new CustomError(400, "Start date and end date is required"));
+  }
   if (assignee.length == 0) return next(new CustomError(400, "Atleast one assignee is required"));
+  if (onDay) {
+    startDate = null;
+    endDate = null;
+    status = "scheduled";
+  }
 
-  const newTask = await Task.create({
+  // if attachments then send them in cloudinary
+  const myClouds = [];
+  if (attachments.length > 0) {
+    for (let i = 0; i < attachments.length; i++) {
+      const myCloud = await uploadOnCloudinary(attachments[i], "tasks", "auto");
+      if (!myCloud?.public_id || !myCloud?.secure_url) {
+        return next(createHttpError(400, "Error While Uploading Task Attachments on Cloudinary"));
+      }
+      myClouds.push({
+        url: myCloud.secure_url,
+        public_id: myCloud.public_id,
+      });
+    }
+  }
+
+  // create task
+  const createTaskDate = {
     title,
     description,
-    startDate,
-    endDate,
     creator: userId,
     assignee,
-  });
-
-  // add task to users tasks
-  await Task.updateMany({ _id: { $in: assignee } }, { $push: { tasks: newTask._id } });
-
+  };
+  if (onDay) createTaskDate.onDay = onDay;
+  if (startDate) createTaskDate.startDate = startDate;
+  if (endDate) createTaskDate.endDate = endDate;
+  if (status) createTaskDate.status = status;
+  if (myClouds.length > 0) {
+    createTaskDate.attachments = myClouds;
+  }
+  const newTask = await Task.create(createTaskDate);
   if (!newTask) return next(new CustomError(500, "Failed to create task"));
+  // add task to assignees model
+  await Task.updateMany({ _id: { $in: assignee } }, { $push: { tasks: newTask._id } });
   res.status(201).json({
     success: true,
     data: "Task created successfully",

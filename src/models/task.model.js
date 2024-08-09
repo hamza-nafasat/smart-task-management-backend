@@ -17,8 +17,13 @@ const taskSchema = new Schema(
         },
       ],
     },
-    startDate: { type: Date, required: true },
-    endDate: { type: Date, required: true },
+    onDay: {
+      type: String,
+      enum: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+      default: null,
+    },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
   },
   { timestamps: true }
 );
