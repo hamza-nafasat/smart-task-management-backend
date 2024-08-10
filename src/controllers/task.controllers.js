@@ -9,10 +9,14 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 const createTask = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
   let { title, description, startDate, endDate, assignee = [], onDay, status } = req.body;
-  const attachments = req.files;
-  assignee = new Set(assignee.split(","));
-  assignee = [...assignee];
+  let attachments = req.files;
 
+  // validation
+  if (!attachments.length) return next(new CustomError(400, "No Attachments found"));
+  if (assignee) {
+    assignee = new Set(assignee?.split(","));
+    assignee = [...assignee];
+  }
   if (!title) return next(new CustomError(400, "Title is required"));
   if (!description) return next(new CustomError(400, "Description is required"));
   if (!onDay && !startDate && !endDate) {
@@ -26,7 +30,7 @@ const createTask = asyncHandler(async (req, res, next) => {
   }
 
   // if attachments then send them in cloudinary
-  const myClouds = [];
+  let myClouds = [];
   if (attachments.length > 0) {
     for (let i = 0; i < attachments.length; i++) {
       const myCloud = await uploadOnCloudinary(attachments[i], "tasks", "auto");
@@ -36,6 +40,8 @@ const createTask = asyncHandler(async (req, res, next) => {
       myClouds.push({
         url: myCloud.secure_url,
         public_id: myCloud.public_id,
+        name: attachments[i].originalname.split("<>")[0],
+        size: attachments[i].size,
       });
     }
   }

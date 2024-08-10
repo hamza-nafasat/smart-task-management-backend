@@ -70,7 +70,9 @@ const deleteComment = asyncHandler(async (req, res, next) => {
 // ------------------
 const getAllComments = asyncHandler(async (req, res, next) => {
   const taskId = req.params?.taskId;
-  const comments = await Comment.find({ user: taskId, parentCommentId: null });
+  const comments = await Comment.find({ task: taskId, parentCommentId: null })
+    .populate("user")
+    .populate("task");
   if (!comments) return next(new CustomError(404, "No comments found"));
   res.status(200).json({
     success: true,
@@ -82,15 +84,19 @@ const getAllComments = asyncHandler(async (req, res, next) => {
 // -------------------------
 const createCommentReply = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const { content, taskId, commentId } = req.body;
-  if (!content || !isValidObjectId(taskId) || !isValidObjectId(commentId)) {
-    return next(new CustomError(400, "Invalid Content or CommentId or TaskId"));
+  const { content, commentId } = req.body;
+  if (!content || !isValidObjectId(commentId)) {
+    return next(new CustomError(400, "Invalid Content or CommentId"));
   }
+  // check comment exists
+  const comment = await Comment.findById(commentId);
+  if (!comment) return next(new CustomError(404, "Comment not found"));
+  // create reply
   const newComment = await Comment.create({
     content,
+    task: comment.task,
     user: userId,
-    task: taskId,
-    parentCommentId: commentId,
+    parentCommentId: comment._id,
   });
   if (!newComment) return next(new CustomError(500, "Failed to Add Reply"));
   res.status(201).json({
@@ -144,7 +150,7 @@ const deleteCommentReply = asyncHandler(async (req, res, next) => {
 // -------------------------
 const getCommentReplies = asyncHandler(async (req, res, next) => {
   const commentId = req.params?.commentId;
-  const replies = await Comment.find({ parentCommentId: commentId });
+  const replies = await Comment.find({ parentCommentId: commentId }).populate("user").populate("task");
   if (!replies) return next(new CustomError(404, "No replies found"));
   res.status(200).json({
     success: true,

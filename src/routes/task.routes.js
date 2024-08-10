@@ -1,5 +1,4 @@
 import express from "express";
-import {} from "../controllers/user.controllers.js";
 import { isAuthenticated } from "../middleware/auth.js";
 import {
   createTask,
@@ -17,7 +16,7 @@ import {
   getCommentReplies,
   updateComment,
   updateCommentReply,
-} from "../controllers/notification.controllers.js";
+} from "../controllers/comment.controllers.js";
 import { multipleUpload } from "../middleware/multer.js";
 
 const app = express();
