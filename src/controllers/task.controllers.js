@@ -2,7 +2,8 @@ import { isValidObjectId } from "mongoose";
 import Task from "../models/task.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import CustomError from "../utils/customError.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import Comment from "../models/comment.model.js";
 
 // create new task
 // ---------------
@@ -53,7 +54,7 @@ const createTask = asyncHandler(async (req, res, next) => {
     creator: userId,
     assignee,
   };
-  if (onDay) createTaskDate.onDay = onDay;
+  if (onDay) createTaskDate.onDay = onDay.toLowerCase();
   if (startDate) createTaskDate.startDate = startDate;
   if (endDate) createTaskDate.endDate = endDate;
   if (status) createTaskDate.status = status;
@@ -111,12 +112,21 @@ const deleteSingleTask = asyncHandler(async (req, res, next) => {
   const taskId = req.params?.taskId;
   const task = await Task.findById(taskId);
   if (!task) return next(new CustomError(404, "Task not found"));
-  if (task.creator.toString() !== userId) return next(new CustomError(403, "You are Not Not authorized"));
+  if (String(task.creator) !== String(userId))
+    return next(new CustomError(403, "You Can't delete this task"));
   const deletedTask = await Task.findByIdAndDelete(taskId);
   if (!deletedTask) return next(new CustomError(500, "Failed to delete task"));
+  // delete all attachments from cloudinary
+  if (task.attachments?.length > 0) {
+    for (let i = 0; i < task.attachments.length; i++) {
+      await removeFromCloudinary(task.attachments[i].public_id, "auto");
+    }
+  }
+  // remove all comments of task
+  await Comment.deleteMany({ task: deletedTask._id });
   res.status(200).json({
     success: true,
-    data: "Task deleted successfully",
+    message: "Task deleted successfully",
   });
 });
 

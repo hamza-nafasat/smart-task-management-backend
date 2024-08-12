@@ -24,10 +24,10 @@ const app = express();
 // create get update and delete task
 app.post("/create", multipleUpload, isAuthenticated, createTask);
 app
-  .route("/single/:taskId", isAuthenticated)
-  .get(getSingleTask)
-  .put(updateSingleTask)
-  .delete(deleteSingleTask);
+  .route("/single/:taskId")
+  .get(isAuthenticated, getSingleTask)
+  .put(isAuthenticated, updateSingleTask)
+  .delete(isAuthenticated, deleteSingleTask);
 
 //   get all tasks
 app.get("/all", isAuthenticated, getAllTasks);
@@ -45,7 +45,10 @@ app.get("/comments/all/:taskId", isAuthenticated, getAllComments);
 app.post("/add-reply/create", isAuthenticated, createCommentReply);
 
 // get update and delete reply from comment
-app.route("/reply/:replyId", isAuthenticated).put(updateCommentReply).delete(deleteCommentReply);
+app
+  .route("/reply/:replyId")
+  .put(isAuthenticated, updateCommentReply)
+  .delete(isAuthenticated, deleteCommentReply);
 
 // get all replies of comment
 app.get("/replies/all/:commentId", isAuthenticated, getCommentReplies);
