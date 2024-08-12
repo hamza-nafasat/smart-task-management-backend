@@ -1,6 +1,7 @@
 import { isValidObjectId } from "mongoose";
 import asyncHandler from "../utils/asyncHandler.js";
 import Comment from "../models/comment.model.js";
+import Task from "../models/task.model.js";
 
 // create new comment
 // ------------------
@@ -18,6 +19,11 @@ const createComment = asyncHandler(async (req, res, next) => {
     task: taskId,
   });
   if (!newComment) return next(new CustomError(500, "Failed to create comment"));
+
+  const task = await Task.findById(taskId);
+  task.commentsCount = task?.commentsCount || 0 + 1;
+  await task.save();
+
   res.status(201).json({
     success: true,
     data: "Comment created successfully",
