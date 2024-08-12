@@ -21,7 +21,7 @@ const createComment = asyncHandler(async (req, res, next) => {
   if (!newComment) return next(new CustomError(500, "Failed to create comment"));
 
   const task = await Task.findById(taskId);
-  task.commentsCount = task?.commentsCount || 0 + 1;
+  task.commentsCount = task.commentsCount ? task.commentsCount + 1 : 1;
   await task.save();
 
   res.status(201).json({
