@@ -5,6 +5,7 @@ import {
   deleteSingleTask,
   getAllTasks,
   getSingleTask,
+  removeAttachmentFromTask,
   updateSingleTask,
 } from "../controllers/task.controllers.js";
 import {
@@ -28,6 +29,8 @@ app
   .get(isAuthenticated, getSingleTask)
   .put(isAuthenticated, multipleUpload, updateSingleTask)
   .delete(isAuthenticated, deleteSingleTask);
+
+app.put("/remove-attachment", isAuthenticated, removeAttachmentFromTask);
 
 //   get all tasks
 app.get("/all", isAuthenticated, getAllTasks);

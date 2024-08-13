@@ -93,6 +93,9 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   console.log("attachments", attachments);
   let { title, description, startDate, endDate, assignee, onDay } = req.body;
   console.log(assignee);
+  if (assignee?.length < 1) {
+    return next(new CustomError(400, "Atleast one assignee is required"));
+  }
   if (assignee && assignee != "removed") {
     assignee = assignee.split(",");
     assignee = new Set(assignee);
@@ -102,10 +105,7 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   if (!task) return next(new CustomError(404, "Task not found"));
   if (String(task.creator) !== String(userId)) return next(new CustomError(403, "You are Not authorized"));
   // update fields
-  if (assignee == "removed") task.assignee = [];
-  else if (assignee) {
-    task.assignee = assignee;
-  }
+  if (assignee) task.assignee = assignee;
   if (title) task.title = title;
   if (description) task.description = description;
   if (onDay) {
@@ -146,6 +146,28 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   });
 });
 
+// remove attachment from task
+// ---------------------------
+const removeAttachmentFromTask = asyncHandler(async (req, res, next) => {
+  const userId = req.user?._id;
+  const { taskId, public_id } = req.body;
+  if (!isValidObjectId(taskId)) return next(new CustomError(400, "Invalid Task Id"));
+  if (!public_id) return next(new CustomError(400, "Invalid Attachment Id"));
+  const task = await Task.findById(taskId);
+  if (!task) return next(new CustomError(404, "Task not found"));
+  if (String(task.creator) !== String(userId)) {
+    return next(new CustomError(403, "You Can't remove this attachment"));
+  }
+  task.attachments = task.attachments.filter((attachment) => attachment.public_id !== public_id);
+  // remove image from cloudinary
+  await removeFromCloudinary(public_id, "auto");
+  const updatedTask = await task.save();
+  if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
+  res.status(200).json({
+    success: true,
+    data: "File removed successfully",
+  });
+});
 // delete single task
 // -----------------
 const deleteSingleTask = asyncHandler(async (req, res, next) => {
@@ -208,4 +230,11 @@ const sendFeedBackToAssignee = asyncHandler(async (req, res, next) => {
   });
 });
 
-export { createTask, getSingleTask, updateSingleTask, deleteSingleTask, getAllTasks };
+export {
+  createTask,
+  getSingleTask,
+  updateSingleTask,
+  removeAttachmentFromTask,
+  deleteSingleTask,
+  getAllTasks,
+};
