@@ -48,6 +48,7 @@ const createTask = asyncHandler(async (req, res, next) => {
   }
 
   // create task
+  // -----------
   const createTaskDate = {
     title,
     description,
@@ -74,7 +75,6 @@ const createTask = asyncHandler(async (req, res, next) => {
 // get single task
 // --------------
 const getSingleTask = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
   const taskId = req.params?.taskId;
   const task = await Task.findById(taskId).populate("creator assignee");
   if (!task) return next(new CustomError(404, "Task not found"));
@@ -89,15 +89,56 @@ const getSingleTask = asyncHandler(async (req, res, next) => {
 const updateSingleTask = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
   const taskId = req.params?.taskId;
-  const { title, description, startDate, endDate, assignee = [] } = req.body;
+  const attachments = req.files;
+  console.log("attachments", attachments);
+  let { title, description, startDate, endDate, assignee, onDay } = req.body;
+  console.log(assignee);
+  if (assignee && assignee != "removed") {
+    assignee = assignee.split(",");
+    assignee = new Set(assignee);
+    assignee = [...assignee];
+  }
   const task = await Task.findById(taskId);
   if (!task) return next(new CustomError(404, "Task not found"));
-  if (task.creator.toString() !== userId) return next(new CustomError(403, "You are Not Not authorized"));
-  const updatedTask = await Task.findByIdAndUpdate(
-    taskId,
-    { title, description, startDate, endDate, assignee },
-    { new: true }
-  );
+  if (String(task.creator) !== String(userId)) return next(new CustomError(403, "You are Not authorized"));
+  // update fields
+  if (assignee == "removed") task.assignee = [];
+  else if (assignee) {
+    task.assignee = assignee;
+  }
+  if (title) task.title = title;
+  if (description) task.description = description;
+  if (onDay) {
+    task.onDay = onDay.toLowerCase();
+    task.startDate = null;
+    task.endDate = null;
+    task.status = "scheduled";
+  } else if (startDate && endDate) {
+    task.startDate = startDate;
+    task.endDate = endDate;
+    task.status = "in-progress";
+    task.onDay = null;
+  }
+
+  let myClouds = [];
+  if (attachments && attachments?.length > 0) {
+    for (let i = 0; i < attachments.length; i++) {
+      const myCloud = await uploadOnCloudinary(attachments[i], "tasks", "auto");
+      if (!myCloud?.public_id || !myCloud?.secure_url) {
+        return next(createHttpError(400, "Error While Uploading Task Attachments on Cloudinary"));
+      }
+      myClouds.push({
+        url: myCloud.secure_url,
+        public_id: myCloud.public_id,
+        name: attachments[i].originalname.split("<>")[0],
+        size: attachments[i].size,
+      });
+    }
+  }
+
+  task.attachments.push(...myClouds);
+  const updatedTask = await task.save();
+
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
   res.status(200).json({
     success: true,

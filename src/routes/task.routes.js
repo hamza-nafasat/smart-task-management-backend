@@ -26,7 +26,7 @@ app.post("/create", multipleUpload, isAuthenticated, createTask);
 app
   .route("/single/:taskId")
   .get(isAuthenticated, getSingleTask)
-  .put(isAuthenticated, updateSingleTask)
+  .put(isAuthenticated, multipleUpload, updateSingleTask)
   .delete(isAuthenticated, deleteSingleTask);
 
 //   get all tasks
