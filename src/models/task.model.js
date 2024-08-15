@@ -26,6 +26,10 @@ const taskSchema = new Schema(
     },
     startDate: { type: Date, default: null },
     commentsCount: { type: Number, default: 0 },
+    isSubmitted: { type: Boolean, default: false },
+    submittedAt: { type: Date, default: null },
+    isCompleted: { type: Boolean, default: false },
+    completedAt: { type: Date, default: null },
     endDate: { type: Date, default: null },
   },
   { timestamps: true }

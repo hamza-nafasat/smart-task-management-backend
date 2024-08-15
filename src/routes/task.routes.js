@@ -1,11 +1,13 @@
 import express from "express";
 import { isAuthenticated } from "../middleware/auth.js";
 import {
+  completeTask,
   createTask,
   deleteSingleTask,
   getAllTasks,
   getSingleTask,
   removeAttachmentFromTask,
+  submitTask,
   updateSingleTask,
 } from "../controllers/task.controllers.js";
 import {
@@ -31,6 +33,11 @@ app
   .delete(isAuthenticated, deleteSingleTask);
 
 app.put("/remove-attachment", isAuthenticated, removeAttachmentFromTask);
+
+// complete and submit task
+app.put("/complete-task/:taskId", isAuthenticated, completeTask);
+
+app.put("/submit-task/:taskId", isAuthenticated, submitTask);
 
 //   get all tasks
 app.get("/all", isAuthenticated, getAllTasks);

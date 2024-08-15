@@ -146,6 +146,44 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   });
 });
 
+// Submit task status
+// --------------------
+const submitTask = asyncHandler(async (req, res, next) => {
+  const userId = req.user?._id;
+  const taskId = req.params?.taskId;
+  const task = await Task.findOne({ _id: taskId, assignee: userId }); // Use findOne instead of find
+  if (!task) return next(new CustomError(404, "Task not found"));
+  if (task.isSubmitted) return next(new CustomError(400, "Task Already Submitted"));
+  task.isSubmitted = true;
+  task.submittedAt = Date.now();
+  console.log(task);
+  const updatedTask = await task.save();
+  if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
+  res.status(200).json({
+    success: true,
+    message: "Task submitted successfully",
+  });
+});
+// complete task status
+// --------------------
+
+const completeTask = asyncHandler(async (req, res, next) => {
+  const userId = req.user?._id;
+  const taskId = req.params?.taskId;
+  const task = await Task.findOne({ _id: taskId, creator: userId });
+  if (!task) return next(new CustomError(404, "Task not found"));
+  if (!task.isSubmitted) return next(new CustomError(400, "Task is not yet submitted. Please submit first"));
+  task.isCompleted = true;
+  task.status = "completed";
+  task.completedAt = Date.now();
+  const updatedTask = await task.save();
+  if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
+  res.status(200).json({
+    success: true,
+    message: "Task completed successfully",
+  });
+});
+
 // remove attachment from task
 // ---------------------------
 const removeAttachmentFromTask = asyncHandler(async (req, res, next) => {
@@ -234,6 +272,8 @@ export {
   createTask,
   getSingleTask,
   updateSingleTask,
+  submitTask,
+  completeTask,
   removeAttachmentFromTask,
   deleteSingleTask,
   getAllTasks,
