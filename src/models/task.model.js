@@ -24,13 +24,13 @@ const taskSchema = new Schema(
       enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
       default: null,
     },
-    startDate: { type: Date, default: null },
+    startDate: { type: String, default: null },
+    endDate: { type: String, default: null },
     commentsCount: { type: Number, default: 0 },
     isSubmitted: { type: Boolean, default: false },
     submittedAt: { type: Date, default: null },
     isCompleted: { type: Boolean, default: false },
     completedAt: { type: Date, default: null },
-    endDate: { type: Date, default: null },
   },
   { timestamps: true }
 );
