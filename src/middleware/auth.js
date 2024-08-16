@@ -14,13 +14,13 @@ const isAuthenticated = asyncHandler(async (req, res, next) => {
     const refreshToken = req.cookies?.[getenv("REFRESH_TOKEN_NAME")];
     if (!refreshToken) return next(new CustomError(400, "please Login again"));
     userId = await tokenService().verifyRefreshToken(refreshToken);
-    user = await User.findById(userId).select("_id role");
+    user = await User.findById(userId).select("_id name role");
     if (!user) return next(new CustomError(400, "please Login again"));
     const isSet = await createAndSetCookies(res, userId);
     if (!isSet) return next(new CustomError(500, "Error While creating and setting Tokens"));
   } else {
     // validate user
-    user = await User.findById(userId).select("_id role");
+    user = await User.findById(userId).select("_id name role");
     if (!user) return next(new CustomError(400, "please Login again"));
   }
   req.user = user;

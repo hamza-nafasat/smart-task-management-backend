@@ -58,11 +58,8 @@ const getAllUsers = asyncHandler(async (req, res, next) => {
   const users = await User.find().select("-password").populate("tasks");
   const modifiedUsers = users.map((user) => {
     let feedbackArr = user.feedback?.map((feed) => Number(feed?.feedback));
-    console.log(feedbackArr);
     let averageRating = feedbackArr?.reduce((a, b) => a + b, 0) / feedbackArr?.length;
-    console.log(averageRating);
     let rating = Math.min(averageRating, 5.0).toFixed(1);
-    console.log(rating);
     return {
       ...user.toObject(),
       inProgressTasks: user.tasks.filter((task) => task.status == "in-progress").length || 0,

@@ -5,11 +5,13 @@ import CustomError from "../utils/customError.js";
 import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import Comment from "../models/comment.model.js";
 import User from "../models/user.model.js";
+import { createActivity } from "../utils/activities.js";
+import Activity from "../models/activity.model.js";
 
 // create new task
 // ---------------
 const createTask = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
+  const { _id: userId, name: userName } = req.user;
   let { title, description, startDate, endDate, assignee = [], onDay, status } = req.body;
   let attachments = req.files;
 
@@ -49,7 +51,6 @@ const createTask = asyncHandler(async (req, res, next) => {
   }
 
   // create task
-  // -----------
   const createTaskDate = {
     title,
     description,
@@ -65,8 +66,18 @@ const createTask = asyncHandler(async (req, res, next) => {
   }
   const newTask = await Task.create(createTaskDate);
   if (!newTask) return next(new CustomError(500, "Failed to create task"));
+  // activity......................................
+  const activity = await createActivity({
+    title: "Task Created",
+    user: userId,
+    message: `${userName.toUpperCase()} created this task.`,
+    task: newTask._id,
+    type: "task",
+  });
+  if (!activity) return next(new CustomError(500, "Failed to create activity"));
+  // activity......................................
   // add task to assignees model
-  await Task.updateMany({ _id: { $in: assignee } }, { $push: { tasks: newTask._id } });
+  await User.updateMany({ _id: { $in: assignee } }, { $push: { tasks: newTask._id } });
   res.status(201).json({
     success: true,
     message: "Task created successfully",
@@ -88,12 +99,10 @@ const getSingleTask = asyncHandler(async (req, res, next) => {
 // update single task
 // -----------------
 const updateSingleTask = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
+  const { _id: userId, name: userName } = req.user;
   const taskId = req.params?.taskId;
   const attachments = req.files;
-  console.log("attachments", attachments);
   let { title, description, startDate, endDate, assignee, onDay } = req.body;
-  console.log(assignee);
   if (assignee?.length < 1) {
     return next(new CustomError(400, "Atleast one assignee is required"));
   }
@@ -104,6 +113,7 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   }
   const task = await Task.findById(taskId);
   if (!task) return next(new CustomError(404, "Task not found"));
+  let oldTask = structuredClone(task.toObject());
   if (String(task.creator) !== String(userId)) return next(new CustomError(403, "You are Not authorized"));
   // update fields
   if (assignee) task.assignee = assignee;
@@ -136,10 +146,71 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
       });
     }
   }
-
   task.attachments.push(...myClouds);
-  const updatedTask = await task.save();
 
+  // -----------------------
+  // add activities in task
+  // -----------------------
+  // title
+  if (title && oldTask.title != title) {
+    const activity = await createActivity({
+      title: "Task Title Updated",
+      user: userId,
+      message: `${userName.toUpperCase()} Updated title from [ ${oldTask.title.toUpperCase()} ] To [ ${title.toUpperCase()} ]`,
+      task: task._id,
+      type: "task",
+    });
+    if (!activity) return next(new CustomError(500, "Failed to create title activity"));
+  }
+  // description
+  if (description && description != oldTask.description) {
+    const activity = await createActivity({
+      title: "Task Description Updated",
+      user: userId,
+      message: `${userName.toUpperCase()} update description From [ ${oldTask.description.toUpperCase()} ] To [ ${description.toUpperCase()} ]`,
+      task: task._id,
+      type: "task",
+    });
+    if (!activity) return next(new CustomError(500, "Failed to create activity"));
+  }
+  // assignee added
+  if (assignee && typeof assignee == "object" && assignee.length > oldTask.assignee.length) {
+    const newAssigneeLength = assignee.length - oldTask.assignee.length;
+    const activity = await createActivity({
+      title: "Task Assignee Added",
+      user: userId,
+      message: `${userName.toUpperCase()} add ${newAssigneeLength} new assignee `,
+      task: task._id,
+      type: "task",
+    });
+    if (!activity) return next(new CustomError(500, "Failed to create activity"));
+  }
+  // assignee removed
+  if (assignee && typeof assignee == "object" && assignee.length < oldTask.assignee.length) {
+    const removedAssigneeLength = oldTask.assignee.length - assignee.length;
+    const activity = await createActivity({
+      title: "Task Assignee Removed",
+      user: userId,
+      message: `${userName.toUpperCase()} remove ${removedAssigneeLength} assignee`,
+      task: task._id,
+      type: "task",
+    });
+    if (!activity) return next(new CustomError(500, "Failed to create activity"));
+  }
+  // add attachments
+  if (myClouds.length > 0) {
+    let attachmentsNames = myClouds.map((a) => a.name).join(", ");
+    const activity = await createActivity({
+      title: "New Attachments Added",
+      user: userId,
+      message: `${myClouds.length} new attachments ${attachmentsNames} added in this task`,
+      task: task._id,
+      type: "task",
+    });
+    if (!activity) return next(new CustomError(500, "Failed to create activity"));
+  }
+
+  const updatedTask = await task.save();
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
   res.status(200).json({
     success: true,
@@ -264,26 +335,15 @@ const getAllTasks = asyncHandler(async (req, res, next) => {
   });
 });
 
-// send feedBack to task assignee
-// ------------------------------
-const sendFeedBackToAssignee = asyncHandler(async (req, res, next) => {
-  const { taskId, userId, feedback } = req.body;
-  if (!isValidObjectId(taskId) || !isValidObjectId(userId))
-    return next(new CustomError(400, "Invalid TaskId or UserId"));
-  if (!feedback) return next(new CustomError(400, "Feedback is required"));
-
-  const [task, assignee] = await Promise.all([Task.findById(taskId), User.findById(userId)]);
-  if (!task) return next(new CustomError(404, "Task not found"));
-  if (!assignee) return next(new CustomError(404, "Assignee not found"));
-  const isUserExistInAssignee = task.assignee.Some((id) => String(id) === String(userId));
-  if (!isUserExistInAssignee) return next(new CustomError(400, "User is not assigned to this task"));
-  // add feedback in assignee modal
-  assignee.rattingAsAssignee.push(feedback);
-  await assignee.save();
-  if (!updatedTask) return next(new CustomError(500, "Failed to send feedback"));
+// get single task activities
+// --------------------------
+const getSingleTaskActivities = asyncHandler(async (req, res, next) => {
+  const taskId = req.params?.taskId;
+  const activities = await Activity.find({ task: taskId }).populate("user");
+  if (!activities) return next(new CustomError(404, "No activities found"));
   res.status(200).json({
     success: true,
-    data: `Feedback sent successfully to assignee ${assignee.name}`,
+    data: activities,
   });
 });
 
@@ -296,4 +356,5 @@ export {
   removeAttachmentFromTask,
   deleteSingleTask,
   getAllTasks,
+  getSingleTaskActivities,
 };

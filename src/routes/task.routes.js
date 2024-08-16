@@ -6,6 +6,7 @@ import {
   deleteSingleTask,
   getAllTasks,
   getSingleTask,
+  getSingleTaskActivities,
   removeAttachmentFromTask,
   submitTask,
   updateSingleTask,
@@ -62,5 +63,9 @@ app
 
 // get all replies of comment
 app.get("/replies/all/:commentId", isAuthenticated, getCommentReplies);
+
+// get all activities of task
+
+app.get("/activities/all/:taskId", isAuthenticated, getSingleTaskActivities);
 
 export default app;
