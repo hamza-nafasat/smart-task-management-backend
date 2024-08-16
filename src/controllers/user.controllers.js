@@ -1,12 +1,11 @@
-import User from "../models/user.model.js";
-import asyncHandler from "../utils/asyncHandler.js";
 import bcrypt from "bcrypt";
-import CustomError from "../utils/customError.js";
-import { sendTokens, tokenService } from "../services/tokenService.js";
 import getenv from "../config/dotenv.js";
-import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import User from "../models/user.model.js";
 import { sendMail } from "../services/nodemailer.js";
-import mongoose, { isValidObjectId, Schema } from "mongoose";
+import { sendTokens, tokenService } from "../services/tokenService.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import CustomError from "../utils/customError.js";
 
 // register a new user
 // -------------------
@@ -58,11 +57,18 @@ const registerUser = asyncHandler(async (req, res, next) => {
 const getAllUsers = asyncHandler(async (req, res, next) => {
   const users = await User.find().select("-password").populate("tasks");
   const modifiedUsers = users.map((user) => {
+    let feedbackArr = user.feedback?.map((feed) => Number(feed?.feedback));
+    console.log(feedbackArr);
+    let averageRating = feedbackArr?.reduce((a, b) => a + b, 0) / feedbackArr?.length;
+    console.log(averageRating);
+    let rating = Math.min(averageRating, 5.0).toFixed(1);
+    console.log(rating);
     return {
       ...user.toObject(),
       inProgressTasks: user.tasks.filter((task) => task.status == "in-progress").length || 0,
       completedTasks: user.tasks.filter((task) => task.status == "completed").length || 0,
       scheduledTasks: user.tasks.filter((task) => task.status == "pending").length || 0,
+      rating,
     };
   });
 
@@ -333,17 +339,17 @@ const resetPassword = asyncHandler(async (req, res, next) => {
 });
 
 export {
-  registerUser,
+  changePassword,
   deleteUser,
   editUser,
-  getSingleUser,
-  loginUser,
   firstLogin,
-  logoutUser,
+  forgetPassword,
   getAllUsers,
   getMyProfile,
-  updateMyProfile,
-  changePassword,
-  forgetPassword,
+  getSingleUser,
+  loginUser,
+  logoutUser,
+  registerUser,
   resetPassword,
+  updateMyProfile,
 };
