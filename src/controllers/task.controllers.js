@@ -4,6 +4,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import CustomError from "../utils/customError.js";
 import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import Comment from "../models/comment.model.js";
+import User from "../models/user.model.js";
 
 // create new task
 // ---------------
@@ -151,12 +152,22 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
 const submitTask = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
   const taskId = req.params?.taskId;
-  const task = await Task.findOne({ _id: taskId, assignee: userId }); // Use findOne instead of find
+  if (!isValidObjectId(taskId)) return next(new CustomError(400, "Invalid Task Id"));
+  const { feedback } = req.body;
+  if (!feedback) return next(new CustomError(400, "Feedback is required"));
+  const task = await Task.findOne({ _id: taskId, assignee: userId });
   if (!task) return next(new CustomError(404, "Task not found"));
   if (task.isSubmitted) return next(new CustomError(400, "Task Already Submitted"));
   task.isSubmitted = true;
   task.submittedAt = Date.now();
-  console.log(task);
+  // update feedback to creator
+  const updateCreator = await User.findByIdAndUpdate(
+    task.creator,
+    { $push: { feedback: { feedback, task: task._id, from: userId } } },
+    { new: true }
+  );
+  if (!updateCreator) return next(new CustomError(500, "Failed to update task"));
+  // now update task status
   const updatedTask = await task.save();
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
   res.status(200).json({
@@ -170,12 +181,20 @@ const submitTask = asyncHandler(async (req, res, next) => {
 const completeTask = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
   const taskId = req.params?.taskId;
+  if (!isValidObjectId(taskId)) return next(new CustomError(400, "Invalid Task Id"));
+  const { feedback } = req.body;
+  if (!feedback) return next(new CustomError(400, "Feedback is required"));
   const task = await Task.findOne({ _id: taskId, creator: userId });
   if (!task) return next(new CustomError(404, "Task not found"));
   if (!task.isSubmitted) return next(new CustomError(400, "Task is not yet submitted. Please submit first"));
   task.isCompleted = true;
   task.status = "completed";
   task.completedAt = Date.now();
+  const updateUsers = await User.updateMany(
+    { _id: { $in: task.assignee } },
+    { $push: { feedback: { feedback: feedback, task: taskId, from: userId } } },
+    { new: true }
+  );
   const updatedTask = await task.save();
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
   res.status(200).json({

@@ -18,8 +18,14 @@ const userSchema = new Schema(
     tasks: [{ type: Schema.Types.ObjectId, ref: "Task" }],
     firstLogin: { type: Boolean, default: true },
     position: { type: String, default: "" },
-
     gender: { type: String, enum: ["male", "female", "other"], required: true },
+    feedback: [
+      {
+        feedback: { type: String, required: true },
+        from: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        task: { type: Schema.Types.ObjectId, ref: "Task", required: true },
+      },
+    ],
   },
   { timestamps: true }
 );
