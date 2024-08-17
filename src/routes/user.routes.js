@@ -8,6 +8,7 @@ import {
   getAllUsers,
   getMyProfile,
   getSingleUser,
+  getSingleUserExtraDetails,
   loginUser,
   logoutUser,
   registerUser,
@@ -45,5 +46,8 @@ app
   .get(isAuthenticated, isAdmin, getSingleUser)
   .put(isAuthenticated, isAdmin, singleUpload, editUser)
   .delete(isAuthenticated, isAdmin, deleteUser);
+
+// details for admin
+app.get("/details/single-user/:userId", isAuthenticated, getSingleUserExtraDetails);
 
 export default app;

@@ -335,6 +335,58 @@ const resetPassword = asyncHandler(async (req, res, next) => {
   res.status(200).json({ success: true, message: "Password Reset Successfully" });
 });
 
+// single user extra details
+// -------------------------
+const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+  const user = await User.findById(userId).select("-password").populate("tasks");
+  if (!user) return next(new CustomError(404, "User not found"));
+  let feedbackArr = user.feedback?.map((feed) => Number(feed?.feedback));
+  let averageRating = feedbackArr?.reduce((a, b) => a + b, 0) / feedbackArr?.length;
+  // making rating of user ===++==++==
+  let rating = Math.min(averageRating, 5.0).toFixed(1);
+  if (isNaN(rating)) rating = 0.0;
+  // checking that how much 1 and how much 2 in this feedback array ===++==++==
+  const groupedArrays = feedbackArr.reduce((acc, val) => {
+    if (!acc[val]) {
+      acc[val] = [];
+    }
+    acc[val].push(val);
+    return acc;
+  }, {});
+  const result = Object.values(groupedArrays);
+  // finding efficiency of rating ===++==++==
+  const maxRating = 5;
+  const totalRatings = feedbackArr.length;
+  const maxPossibleSum = maxRating * totalRatings;
+  const efficiency = (feedbackArr?.reduce((a, b) => a + b, 0) / maxPossibleSum) * 100;
+
+  // chart data ===++==++==
+  const chartData = [
+    { label: "Completed", value: 0 },
+    { label: "In Progress", value: 0 },
+    { label: "Schedule", value: 0 },
+  ];
+  user.tasks?.forEach((task) => {
+    if (task.status === "completed") {
+      chartData[0].value += 1;
+    } else if (task.status === "in-progress") {
+      chartData[1].value += 1;
+    } else if (task.status === "schedule") {
+      chartData[2].value += 1;
+    }
+  });
+
+  let userWithRating = {
+    ...user._doc,
+    rating,
+    rattingArrays: result,
+    ratingEfficiency: efficiency.toFixed(1),
+    chartData,
+  };
+  res.status(200).json({ success: true, data: userWithRating });
+});
+
 export {
   changePassword,
   deleteUser,
@@ -349,4 +401,5 @@ export {
   registerUser,
   resetPassword,
   updateMyProfile,
+  getSingleUserExtraDetails,
 };
