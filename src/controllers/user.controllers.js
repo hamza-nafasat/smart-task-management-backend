@@ -6,6 +6,7 @@ import { sendTokens, tokenService } from "../services/tokenService.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import CustomError from "../utils/customError.js";
+import Task from "../models/task.model.js";
 
 // register a new user
 // -------------------
@@ -339,9 +340,16 @@ const resetPassword = asyncHandler(async (req, res, next) => {
 // -------------------------
 const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
   const { userId } = req.params;
-  const user = await User.findById(userId).select("-password").populate("tasks");
+  const user = await User.findById(userId).select("-password").populate("tasks").populate({
+    path: "feedback.task",
+    select: "status",
+  });
   if (!user) return next(new CustomError(404, "User not found"));
-  let feedbackArr = user.feedback?.map((feed) => Number(feed?.feedback));
+  let feedbackArr = user.feedback?.map((feed) => {
+    if (feed?.task?.status) {
+      return Number(feed?.feedback);
+    }
+  });
   let averageRating = feedbackArr?.reduce((a, b) => a + b, 0) / feedbackArr?.length;
   // making rating of user ===++==++==
   let rating = Math.min(averageRating, 5.0).toFixed(1);
@@ -362,27 +370,63 @@ const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
   const efficiency = (feedbackArr?.reduce((a, b) => a + b, 0) / maxPossibleSum) * 100;
 
   // chart data ===++==++==
-  const chartData = [
-    { label: "Completed", value: 0 },
-    { label: "In Progress", value: 0 },
-    { label: "Schedule", value: 0 },
-  ];
-  user.tasks?.forEach((task) => {
-    if (task.status === "completed") {
-      chartData[0].value += 1;
-    } else if (task.status === "in-progress") {
-      chartData[1].value += 1;
-    } else if (task.status === "schedule") {
-      chartData[2].value += 1;
+
+  const inProgressTasksFeedBackArray = [];
+  const completedTasksFeedBackArray = [];
+  const scheduledTasksFeedBackArray = [];
+  user.feedback?.forEach((feed) => {
+    if (feed?.task?.status === "in-progress") {
+      inProgressTasksFeedBackArray.push(feed?.feedback);
+    } else if (feed?.task?.status === "completed") {
+      completedTasksFeedBackArray.push(feed?.feedback);
+    } else if (feed?.task?.status === "scheduled") {
+      scheduledTasksFeedBackArray.push(feed?.feedback);
     }
+  });
+
+  // Total number of accurate feedback items
+  const totalFeedbackCount = user.feedback.map((feed) => {
+    if (feed?.task?.status) return 1;
+  }).length;
+
+  // Calculate the number of feedbacks for each status
+  const inProgressCount = inProgressTasksFeedBackArray.length;
+  const completedCount = completedTasksFeedBackArray.length;
+  const scheduledCount = scheduledTasksFeedBackArray.length;
+
+  // Calculate the percentage for each status
+  const inProgressPercentage = (inProgressCount / totalFeedbackCount) * 100;
+  const completedPercentage = (completedCount / totalFeedbackCount) * 100;
+  const scheduledPercentage = (scheduledCount / totalFeedbackCount) * 100;
+
+  const chartData = [
+    { label: "Completed", value: completedPercentage.toFixed(1) },
+    { label: "In Progress", value: inProgressPercentage.toFixed(1) },
+    { label: "Schedule", value: scheduledPercentage.toFixed(1) },
+  ];
+
+  // find all tasks where this user is assignee or creator
+  const tasksOfUser = await Task.find({ $or: [{ creator: userId }, { assignee: userId }] }).populate({
+    path: "creator",
+    select: "name",
+  });
+
+  const modifiedTasksOfUser = tasksOfUser.map((task) => {
+    return {
+      ...task._doc,
+      creator: task.creator?.name,
+      rattingForMe:
+        user?.feedback?.find((feed) => String(feed?.task?._id) === String(task?._id))?.feedback || "Not Yet",
+    };
   });
 
   let userWithRating = {
     ...user._doc,
     rating,
     rattingArrays: result,
-    ratingEfficiency: efficiency.toFixed(1),
+    ratingEfficiency: efficiency.toFixed(0),
     chartData,
+    tasks: modifiedTasksOfUser,
   };
   res.status(200).json({ success: true, data: userWithRating });
 });

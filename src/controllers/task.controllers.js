@@ -383,7 +383,7 @@ const getAllTasks = asyncHandler(async (req, res, next) => {
 // --------------------------
 const getSingleTaskActivities = asyncHandler(async (req, res, next) => {
   const taskId = req.params?.taskId;
-  const activities = await Activity.find({ task: taskId }).populate("user");
+  const activities = await Activity.find({ task: taskId }).populate("user").sort({ createdAt: -1 });
   if (!activities) return next(new CustomError(404, "No activities found"));
   res.status(200).json({
     success: true,
