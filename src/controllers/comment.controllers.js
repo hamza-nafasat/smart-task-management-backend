@@ -2,11 +2,12 @@ import { isValidObjectId } from "mongoose";
 import asyncHandler from "../utils/asyncHandler.js";
 import Comment from "../models/comment.model.js";
 import Task from "../models/task.model.js";
+import { createActivity } from "../utils/activities.js";
 
 // create new comment
 // ------------------
 const createComment = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
+  const { _id: userId, name: userName } = req.user;
   const { content, taskId } = req.body;
 
   if (!content || !isValidObjectId(taskId)) {
@@ -23,6 +24,16 @@ const createComment = asyncHandler(async (req, res, next) => {
   const task = await Task.findById(taskId);
   task.commentsCount = task.commentsCount ? task.commentsCount + 1 : 1;
   await task.save();
+
+  // add activity
+  const activity = await createActivity({
+    title: "New Comment Added",
+    user: userId,
+    message: `${userName.toUpperCase()} added one comment [${content}] to this task.`,
+    task: taskId,
+    type: "comment",
+  });
+  if (!activity) return next(new CustomError(500, "Failed to create activity"));
 
   res.status(201).json({
     success: true,
@@ -89,7 +100,7 @@ const getAllComments = asyncHandler(async (req, res, next) => {
 // create comment reply
 // -------------------------
 const createCommentReply = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
+  const { _id: userId, name: userName } = req.user;
   const { content, commentId } = req.body;
   if (!content || !isValidObjectId(commentId)) {
     return next(new CustomError(400, "Invalid Content or CommentId"));
@@ -105,6 +116,15 @@ const createCommentReply = asyncHandler(async (req, res, next) => {
     parentCommentId: comment._id,
   });
   if (!newComment) return next(new CustomError(500, "Failed to Add Reply"));
+  // add activity
+  const activity = await createActivity({
+    title: "New Reply Added",
+    user: userId,
+    message: `${userName.toUpperCase()} add one reply [ ${content} ] to this comment [ ${comment.content} ].`,
+    task: comment.task,
+    type: "comment",
+  });
+  if (!activity) return next(new CustomError(500, "Failed to create activity"));
   res.status(201).json({
     success: true,
     data: "Reply Added successfully",

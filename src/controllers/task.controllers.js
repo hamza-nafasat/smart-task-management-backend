@@ -221,7 +221,7 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
 // Submit task status
 // --------------------
 const submitTask = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
+  const { _id: userId, name: userName } = req.user;
   const taskId = req.params?.taskId;
   if (!isValidObjectId(taskId)) return next(new CustomError(400, "Invalid Task Id"));
   const { feedback } = req.body;
@@ -241,6 +241,24 @@ const submitTask = asyncHandler(async (req, res, next) => {
   // now update task status
   const updatedTask = await task.save();
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
+  // create activity
+  const [activity1, activity2] = await Promise.all([
+    createActivity({
+      title: "Task Submitted",
+      user: userId,
+      message: `${userName.toUpperCase()} submitted this task.`,
+      task: task._id,
+      type: "task",
+    }),
+    createActivity({
+      title: "Feedback Submitted to Creator",
+      user: userId,
+      message: `${userName.toUpperCase()} submitted feedback.`,
+      task: task._id,
+      type: "feedback",
+    }),
+  ]);
+  if (!activity1 || !activity2) return next(new CustomError(500, "Failed to create Submit activity"));
   res.status(200).json({
     success: true,
     message: "Task submitted successfully",
@@ -250,7 +268,7 @@ const submitTask = asyncHandler(async (req, res, next) => {
 // --------------------
 
 const completeTask = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
+  const { _id: userId, name: userName } = req.user;
   const taskId = req.params?.taskId;
   if (!isValidObjectId(taskId)) return next(new CustomError(400, "Invalid Task Id"));
   const { feedback } = req.body;
@@ -268,6 +286,24 @@ const completeTask = asyncHandler(async (req, res, next) => {
   );
   const updatedTask = await task.save();
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
+  // create activity
+  const [activity1, activity2] = await Promise.all([
+    createActivity({
+      title: "Task Completed",
+      user: userId,
+      message: `${userName.toUpperCase()} completed this task.`,
+      task: task._id,
+      type: "task",
+    }),
+    createActivity({
+      title: "Feedback Submitted to Assignee",
+      user: userId,
+      message: `${userName.toUpperCase()} submitted feedback to assignee of this task.`,
+      task: task._id,
+      type: "feedback",
+    }),
+  ]);
+  if (!activity1 || !activity2) return next(new CustomError(500, "Failed to create Submit activity"));
   res.status(200).json({
     success: true,
     message: "Task completed successfully",
@@ -290,7 +326,19 @@ const removeAttachmentFromTask = asyncHandler(async (req, res, next) => {
   // remove image from cloudinary
   await removeFromCloudinary(public_id, "auto");
   const updatedTask = await task.save();
+
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
+
+  // create activity
+  const activity = await createActivity({
+    title: "Attachment Removed",
+    user: userId,
+    message: `${userName.toUpperCase()} remove one attachment from this task.`,
+    task: task._id,
+    type: "task",
+  });
+  if (!activity) return next(new CustomError(500, "Failed to create activity"));
+
   res.status(200).json({
     success: true,
     data: "File removed successfully",
