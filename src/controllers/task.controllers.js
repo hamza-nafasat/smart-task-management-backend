@@ -16,7 +16,6 @@ const createTask = asyncHandler(async (req, res, next) => {
   let attachments = req.files;
 
   // validation
-  if (!attachments.length) return next(new CustomError(400, "No Attachments found"));
   if (assignee) {
     assignee = new Set(assignee?.split(","));
     assignee = [...assignee];
@@ -68,14 +67,13 @@ const createTask = asyncHandler(async (req, res, next) => {
   if (!newTask) return next(new CustomError(500, "Failed to create task"));
   // activity......................................
   const activity = await createActivity({
-    title: "Task Created",
+    title: `This Task Created by ${userName?.toUpperCase()}`,
     user: userId,
     message: `${userName.toUpperCase()} created this task.`,
     task: newTask._id,
     type: "task",
   });
   if (!activity) return next(new CustomError(500, "Failed to create activity"));
-  // activity......................................
   // add task to assignees model
   await User.updateMany({ _id: { $in: assignee } }, { $push: { tasks: newTask._id } });
   res.status(201).json({
@@ -154,9 +152,9 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   // title
   if (title && oldTask.title != title) {
     const activity = await createActivity({
-      title: "Task Title Updated",
+      title: `Task Title Updated by ${userName?.toUpperCase()}`,
       user: userId,
-      message: `${userName.toUpperCase()} Updated title from [ ${oldTask.title.toUpperCase()} ] To [ ${title.toUpperCase()} ]`,
+      message: `${userName.toUpperCase()} Update task title from [ ${oldTask.title.toUpperCase()} ] To [ ${title.toUpperCase()} ]`,
       task: task._id,
       type: "task",
     });
@@ -165,9 +163,9 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   // description
   if (description && description != oldTask.description) {
     const activity = await createActivity({
-      title: "Task Description Updated",
+      title: `Task Description Updated by ${userName?.toUpperCase()}`,
       user: userId,
-      message: `${userName.toUpperCase()} update description From [ ${oldTask.description.toUpperCase()} ] To [ ${description.toUpperCase()} ]`,
+      message: `${userName.toUpperCase()} update task description From [ ${oldTask.description.toUpperCase()} ] To [ ${description.toUpperCase()} ]`,
       task: task._id,
       type: "task",
     });
@@ -177,7 +175,7 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   if (assignee && typeof assignee == "object" && assignee.length > oldTask.assignee.length) {
     const newAssigneeLength = assignee.length - oldTask.assignee.length;
     const activity = await createActivity({
-      title: "Task Assignee Added",
+      title: `Task Assignee Added by ${userName?.toUpperCase()}`,
       user: userId,
       message: `${userName.toUpperCase()} add ${newAssigneeLength} new assignee `,
       task: task._id,
@@ -189,7 +187,7 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   if (assignee && typeof assignee == "object" && assignee.length < oldTask.assignee.length) {
     const removedAssigneeLength = oldTask.assignee.length - assignee.length;
     const activity = await createActivity({
-      title: "Task Assignee Removed",
+      title: `Task Assignee Removed by ${userName?.toUpperCase()}`,
       user: userId,
       message: `${userName.toUpperCase()} remove ${removedAssigneeLength} assignee`,
       task: task._id,
@@ -201,7 +199,7 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   if (myClouds.length > 0) {
     let attachmentsNames = myClouds.map((a) => a.name).join(", ");
     const activity = await createActivity({
-      title: "New Attachments Added",
+      title: `Task Attachments Added by ${userName?.toUpperCase()}`,
       user: userId,
       message: `${myClouds.length} new attachments ${attachmentsNames} added in this task`,
       task: task._id,
@@ -244,14 +242,14 @@ const submitTask = asyncHandler(async (req, res, next) => {
   // create activity
   const [activity1, activity2] = await Promise.all([
     createActivity({
-      title: "Task Submitted",
+      title: `Task Submitted by ${userName?.toUpperCase()}`,
       user: userId,
-      message: `${userName.toUpperCase()} submitted this task.`,
+      message: `${userName.toUpperCase()} submit this task.`,
       task: task._id,
       type: "task",
     }),
     createActivity({
-      title: "Feedback Submitted to Creator",
+      title: `Feedback Sent by ${userName?.toUpperCase()} To Creator`,
       user: userId,
       message: `${userName.toUpperCase()} submitted feedback.`,
       task: task._id,
@@ -289,14 +287,14 @@ const completeTask = asyncHandler(async (req, res, next) => {
   // create activity
   const [activity1, activity2] = await Promise.all([
     createActivity({
-      title: "Task Completed",
+      title: `Task Completed by ${userName?.toUpperCase()}`,
       user: userId,
       message: `${userName.toUpperCase()} completed this task.`,
       task: task._id,
       type: "task",
     }),
     createActivity({
-      title: "Feedback Submitted to Assignee",
+      title: `Feedback Sent by ${userName?.toUpperCase()} To All Assignees`,
       user: userId,
       message: `${userName.toUpperCase()} submitted feedback to assignee of this task.`,
       task: task._id,
@@ -313,7 +311,7 @@ const completeTask = asyncHandler(async (req, res, next) => {
 // remove attachment from task
 // ---------------------------
 const removeAttachmentFromTask = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
+  const { _id: userId, name: userName } = req.user;
   const { taskId, public_id } = req.body;
   if (!isValidObjectId(taskId)) return next(new CustomError(400, "Invalid Task Id"));
   if (!public_id) return next(new CustomError(400, "Invalid Attachment Id"));
@@ -326,12 +324,10 @@ const removeAttachmentFromTask = asyncHandler(async (req, res, next) => {
   // remove image from cloudinary
   await removeFromCloudinary(public_id, "auto");
   const updatedTask = await task.save();
-
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
-
   // create activity
   const activity = await createActivity({
-    title: "Attachment Removed",
+    title: `Attachment Removed by ${userName.toUpperCase()}`,
     user: userId,
     message: `${userName.toUpperCase()} remove one attachment from this task.`,
     task: task._id,

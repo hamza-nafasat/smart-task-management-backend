@@ -27,9 +27,9 @@ const createComment = asyncHandler(async (req, res, next) => {
 
   // add activity
   const activity = await createActivity({
-    title: "New Comment Added",
+    title: `Comment Added by ${userName?.toUpperCase()}`,
     user: userId,
-    message: `${userName.toUpperCase()} added one comment [${content}] to this task.`,
+    message: `${userName?.toUpperCase()} added one comment [${content}] to this task.`,
     task: taskId,
     type: "comment",
   });
@@ -118,7 +118,7 @@ const createCommentReply = asyncHandler(async (req, res, next) => {
   if (!newComment) return next(new CustomError(500, "Failed to Add Reply"));
   // add activity
   const activity = await createActivity({
-    title: "New Reply Added",
+    title: `New Reply Added by ${userName?.toUpperCase()}`,
     user: userId,
     message: `${userName.toUpperCase()} add one reply [ ${content} ] to this comment [ ${comment.content} ].`,
     task: comment.task,
