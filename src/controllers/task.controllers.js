@@ -76,7 +76,21 @@ const createTask = asyncHandler(async (req, res, next) => {
   });
   if (!activity) return next(new CustomError(500, "Failed to create activity"));
   // add task to assignees model
-  await User.updateMany({ _id: { $in: assignee } }, { $push: { tasks: newTask._id } });
+  await Promise.all(
+    newTask.assignee?.map(async (assigneeId) => {
+      const user = await User.findById(assigneeId);
+      if (user) {
+        user.tasks.push(newTask._id);
+        return user.save();
+      }
+    })
+  );
+  // add task to creator model
+  const user = await User.findById(newTask.creator);
+  if (user) {
+    user.tasks.push(newTask._id);
+    await user.save();
+  }
   res.status(201).json({
     success: true,
     message: "Task created successfully",
@@ -147,9 +161,8 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   }
   task.attachments.push(...myClouds);
 
-  // -----------------------
   // add activities in task
-  // -----------------------
+
   // title
   if (title && oldTask.title != title) {
     const activity = await createActivity({
@@ -213,7 +226,7 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
   res.status(200).json({
     success: true,
-    data: "Task updated successfully",
+    message: "Task updated successfully",
   });
 });
 

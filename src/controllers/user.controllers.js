@@ -28,12 +28,18 @@ const registerUser = asyncHandler(async (req, res, next) => {
 
   // hash password and create user
   const hashedPassword = await bcrypt.hash(password, 10);
-
   // upload image on cloudinary then create user
   const myCloud = await uploadOnCloudinary(image, "users", "image");
   if (!myCloud?.public_id || !myCloud?.secure_url) {
     return next(createHttpError(400, "Error While Uploading User Image on Cloudinary"));
   }
+
+  const mail = await sendMail(email, "Welcome To Task Manager", `Hello ${name}, Welcome To Task Manager`);
+  if (!mail) {
+    await removeFromCloudinary(myCloud.public_id);
+    return next(new CustomError(400, "Email is Not Correct please try again"));
+  }
+
   const newUser = await User.create({
     name,
     email,
@@ -46,6 +52,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
       public_id: myCloud.public_id,
     },
   });
+
   if (!newUser) return next(new CustomError(500, "Failed to create user"));
   res.status(201).json({
     success: true,
@@ -65,7 +72,7 @@ const getAllUsers = asyncHandler(async (req, res, next) => {
       ...user.toObject(),
       inProgressTasks: user.tasks.filter((task) => task.status == "in-progress").length || 0,
       completedTasks: user.tasks.filter((task) => task.status == "completed").length || 0,
-      scheduledTasks: user.tasks.filter((task) => task.status == "pending").length || 0,
+      scheduledTasks: user.tasks.filter((task) => task.status == "scheduled").length || 0,
       rating,
     };
   });
@@ -86,12 +93,6 @@ const deleteUser = asyncHandler(async (req, res, next) => {
   }
   const user = await User.findById(userId);
   if (!user) return next(new CustomError(404, "User not found"));
-  if (String(user._id) === "66b4bbff049ce7259b05fa75") {
-    return next(new CustomError(400, "Don't delete Me I Am Working On Backend"));
-  }
-  if (String(user._id == "66b5c37dd27be1d293b82d6c")) {
-    return next(new CustomError(400, "Don't delete Me I Am Working On Frontend"));
-  }
   const deletedUser = await User.findByIdAndDelete(userId);
   if (!deletedUser) return next(new CustomError(404, "User not found"));
   res.status(200).json({
@@ -225,7 +226,6 @@ const getMyProfile = asyncHandler(async (req, res, next) => {
   user.feedback?.forEach((feed) => {
     if (feed?.task?.status) feedbackArr.push(feed?.feedback);
   });
-  console.log(feedbackArr);
   const maxRating = 5;
   const totalRatings = feedbackArr.length;
   const maxPossibleSum = maxRating * totalRatings;
@@ -234,7 +234,6 @@ const getMyProfile = asyncHandler(async (req, res, next) => {
     ...user._doc,
     efficiency: isNaN(efficiency) ? 0 : Number(efficiency),
   };
-  console.log(modifiedUser);
   res.status(200).json({
     success: true,
     data: modifiedUser,
@@ -361,9 +360,10 @@ const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
     select: "status",
   });
   if (!user) return next(new CustomError(404, "User not found"));
-  let feedbackArr = user.feedback?.map((feed) => {
+  let feedbackArr = [];
+  user.feedback?.forEach((feed) => {
     if (feed?.task?.status) {
-      return Number(feed?.feedback);
+      feedbackArr.push(Number(feed?.feedback));
     }
   });
   let averageRating = feedbackArr?.reduce((a, b) => a + b, 0) / feedbackArr?.length;
@@ -401,9 +401,7 @@ const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
   });
 
   // Total number of accurate feedback items
-  const totalFeedbackCount = user.feedback.map((feed) => {
-    if (feed?.task?.status) return 1;
-  }).length;
+  const totalFeedbackCount = feedbackArr.length;
 
   // Calculate the number of feedbacks for each status
   const inProgressCount = inProgressTasksFeedBackArray.length;
