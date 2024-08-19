@@ -400,9 +400,9 @@ const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
   const scheduledPercentage = (scheduledCount / totalFeedbackCount) * 100;
 
   const chartData = [
-    { label: "Completed", value: completedPercentage.toFixed(1) },
-    { label: "In Progress", value: inProgressPercentage.toFixed(1) },
-    { label: "Schedule", value: scheduledPercentage.toFixed(1) },
+    { label: "Completed", value: isNaN(completedPercentage) ? 0 : completedPercentage.toFixed(1) },
+    { label: "In Progress", value: isNaN(inProgressPercentage) ? 0 : inProgressPercentage.toFixed(1) },
+    { label: "Schedule", value: isNaN(scheduledPercentage) ? 0 : scheduledPercentage.toFixed(1) },
   ];
 
   // find all tasks where this user is assignee or creator
@@ -424,7 +424,7 @@ const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
     ...user._doc,
     rating,
     rattingArrays: result,
-    ratingEfficiency: efficiency.toFixed(0),
+    ratingEfficiency: isNaN(efficiency) ? 0 : efficiency.toFixed(1),
     chartData,
     tasks: modifiedTasksOfUser,
   };
