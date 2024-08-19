@@ -54,6 +54,7 @@ const createTask = asyncHandler(async (req, res, next) => {
     title,
     description,
     creator: userId,
+    creatorName: userName,
     assignee,
   };
   if (onDay) createTaskDate.onDay = onDay.toLowerCase();
@@ -226,6 +227,16 @@ const submitTask = asyncHandler(async (req, res, next) => {
   if (!feedback) return next(new CustomError(400, "Feedback is required"));
   const task = await Task.findOne({ _id: taskId, assignee: userId });
   if (!task) return next(new CustomError(404, "Task not found"));
+  if (task.status === "scheduled") {
+    await createActivity({
+      title: `Task Submitted by ${userName?.toUpperCase()}`,
+      user: userId,
+      message: `${userName.toUpperCase()} submit this task.`,
+      task: task._id,
+      type: "task",
+    });
+    return res.status(200).json({ success: true, message: "Task Submitted for Today" });
+  }
   if (task.isSubmitted) return next(new CustomError(400, "Task Already Submitted"));
   task.isSubmitted = true;
   task.submittedAt = Date.now();
@@ -369,9 +380,9 @@ const deleteSingleTask = asyncHandler(async (req, res, next) => {
 // -------------
 const getAllTasks = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const tasks = await Task.find({ $or: [{ creator: userId }, { assignee: userId }] }).populate(
-    "creator assignee"
-  );
+  const tasks = await Task.find({ $or: [{ creator: userId }, { assignee: userId }] })
+    .populate("creator assignee")
+    .sort({ createdAt: -1 });
   if (!tasks) return next(new CustomError(404, "No tasks found"));
   res.status(200).json({
     success: true,
@@ -391,6 +402,22 @@ const getSingleTaskActivities = asyncHandler(async (req, res, next) => {
   });
 });
 
+// filter all tasks
+// ----------------
+const filterAllTasks = asyncHandler(async (req, res, next) => {
+  const { status, startDate, endDate, creatorName } = req.query;
+  const taskFilteredData = {};
+  if (status) taskFilteredData.status = status;
+  if (creatorName) taskFilteredData.creatorName = { $regex: creatorName, $options: "i" };
+  if (startDate) taskFilteredData.startDate = { $gte: new Date(startDate) };
+  if (endDate) taskFilteredData.endDate = { $lte: new Date(endDate) };
+  const tasks = await Task.find(taskFilteredData).populate("creator", "name").populate("assignee", "name");
+  res.status(200).json({
+    success: true,
+    data: tasks,
+  });
+});
+
 export {
   createTask,
   getSingleTask,
@@ -401,4 +428,5 @@ export {
   deleteSingleTask,
   getAllTasks,
   getSingleTaskActivities,
+  filterAllTasks,
 };

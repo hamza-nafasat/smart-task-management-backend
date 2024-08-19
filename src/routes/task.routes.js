@@ -4,6 +4,7 @@ import {
   completeTask,
   createTask,
   deleteSingleTask,
+  filterAllTasks,
   getAllTasks,
   getSingleTask,
   getSingleTaskActivities,
@@ -67,5 +68,9 @@ app.get("/replies/all/:commentId", isAuthenticated, getCommentReplies);
 // get all activities of task
 
 app.get("/activities/all/:taskId", isAuthenticated, getSingleTaskActivities);
+
+// get all task data by filtering by admin
+
+app.get("/filter/all", isAuthenticated, filterAllTasks);
 
 export default app;

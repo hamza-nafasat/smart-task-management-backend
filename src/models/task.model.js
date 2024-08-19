@@ -8,6 +8,7 @@ const taskSchema = new Schema(
     description: { type: String, required: true },
     status: { type: String, enum: ["in-progress", "completed", "scheduled"], default: "in-progress" },
     creator: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    creatorName: { type: String, required: true },
     assignee: { type: [Schema.Types.ObjectId], ref: "User" },
     attachments: {
       type: [
@@ -24,8 +25,8 @@ const taskSchema = new Schema(
       enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
       default: null,
     },
-    startDate: { type: String, default: null },
-    endDate: { type: String, default: null },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
     commentsCount: { type: Number, default: 0 },
     isSubmitted: { type: Boolean, default: false },
     submittedAt: { type: Date, default: null },

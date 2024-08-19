@@ -56,7 +56,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
 //  get all users
 // ---------------
 const getAllUsers = asyncHandler(async (req, res, next) => {
-  const users = await User.find().select("-password").populate("tasks");
+  const users = await User.find().select("-password").populate("tasks").sort({ createdAt: -1 });
   const modifiedUsers = users.map((user) => {
     let feedbackArr = user.feedback?.map((feed) => Number(feed?.feedback));
     let averageRating = feedbackArr?.reduce((a, b) => a + b, 0) / feedbackArr?.length;
@@ -217,11 +217,27 @@ const logoutUser = asyncHandler(async (req, res, next) => {
 // -------------
 const getMyProfile = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const user = await User.findById(userId).select("-password");
+  const user = await User.findById(userId).select("-password").populate({
+    path: "feedback.task",
+  });
   if (!user) return next(new CustomError(404, "User not found"));
+  let feedbackArr = [];
+  user.feedback?.forEach((feed) => {
+    if (feed?.task?.status) feedbackArr.push(feed?.feedback);
+  });
+  console.log(feedbackArr);
+  const maxRating = 5;
+  const totalRatings = feedbackArr.length;
+  const maxPossibleSum = maxRating * totalRatings;
+  const efficiency = (feedbackArr?.reduce((a, b) => a + b, 0) / maxPossibleSum) * 100;
+  let modifiedUser = {
+    ...user._doc,
+    efficiency: isNaN(efficiency) ? 0 : Number(efficiency),
+  };
+  console.log(modifiedUser);
   res.status(200).json({
     success: true,
-    data: user,
+    data: modifiedUser,
   });
 });
 
