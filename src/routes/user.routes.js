@@ -12,6 +12,7 @@ import {
   loginUser,
   logoutUser,
   registerUser,
+  registerUsersFromExcelFile,
   resetPassword,
   updateMyProfile,
 } from "../controllers/user.controllers.js";
@@ -21,6 +22,7 @@ import { singleUpload } from "../middleware/multer.js";
 const app = express();
 
 // register login and logout
+app.post("/register-from-excel", isAuthenticated, singleUpload, registerUsersFromExcelFile);
 app.post("/create", singleUpload, registerUser);
 app.post("/login", loginUser);
 app.get("/logout", isAuthenticated, logoutUser);

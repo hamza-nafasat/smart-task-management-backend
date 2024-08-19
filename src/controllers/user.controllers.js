@@ -7,6 +7,8 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import CustomError from "../utils/customError.js";
 import Task from "../models/task.model.js";
+import dotenv from "../config/dotenv.js";
+import { returnWelcomeMessage } from "../config/constants.js";
 
 // register a new user
 // -------------------
@@ -17,6 +19,9 @@ const registerUser = asyncHandler(async (req, res, next) => {
   if (!name || !username || !email || !password || !gender || !position) {
     return next(new CustomError(400, "All fields are required"));
   }
+  const usernameRegex = /^[a-z0-9]+$/;
+  if (!usernameRegex.test(username))
+    return next(new CustomError(400, "Invalid username only lowercase latter numbers are allowed"));
 
   // check that username and email are unique
   let [uniqueUsername, isUniqueEmail] = await Promise.all([
@@ -34,7 +39,12 @@ const registerUser = asyncHandler(async (req, res, next) => {
     return next(createHttpError(400, "Error While Uploading User Image on Cloudinary"));
   }
 
-  const mail = await sendMail(email, "Welcome To Task Manager", `Hello ${name}, Welcome To Task Manager`);
+  const mail = await sendMail(
+    email,
+    "Welcome To Smart Task",
+    returnWelcomeMessage(name, dotenv("FRONTEND_URL")),
+    true
+  );
   if (!mail) {
     await removeFromCloudinary(myCloud.public_id);
     return next(new CustomError(400, "Email is Not Correct please try again"));
@@ -60,6 +70,65 @@ const registerUser = asyncHandler(async (req, res, next) => {
   });
 });
 
+// register users from excel file
+// ------------------------------
+const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
+  const file = req.file;
+  if (!file) return next(new CustomError(400, "Please provide a file"));
+  const workbook = XLSX.readFile(file.path);
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+  const usersToInsert = [];
+  const existingUsers = [];
+  const errors = [];
+
+  for (const row of worksheet) {
+    // Check if all required fields are present
+    if (!row.name || !row.username || !row.email || !row.gender || !row.position) {
+      errors.push(`Missing fields in row: ${JSON.stringify(row)}`);
+      continue;
+    }
+
+    // Validate username
+    const usernameRegex = /^[a-z0-9]+$/;
+    if (!usernameRegex.test(row.username)) {
+      errors.push(`Invalid username in row: ${JSON.stringify(row)}`);
+      continue;
+    }
+
+    // Check if the username or email already exists in the database
+    const existingUser = await User.findOne({
+      $or: [{ username: row.username }, { email: row.email }],
+    });
+
+    if (existingUser) {
+      existingUsers.push(existingUser);
+      continue;
+    }
+
+    // Prepare user object for insertion
+    usersToInsert.push({
+      name: row.name,
+      username: row.username,
+      email: row.email,
+      gender: row.gender,
+      position: row.position,
+    });
+  }
+
+  // Insert valid users into the database
+  const insertedUsers = await User.insertMany(usersToInsert);
+
+  // Send response
+  res.status(200).json({
+    success: true,
+    message: "File processed successfully!",
+    insertedUsersCount: insertedUsers.length,
+    existingUsersCount: existingUsers.length,
+    errors,
+  });
+});
 //  get all users
 // ---------------
 const getAllUsers = asyncHandler(async (req, res, next) => {
@@ -460,4 +529,5 @@ export {
   resetPassword,
   updateMyProfile,
   getSingleUserExtraDetails,
+  registerUsersFromExcelFile,
 };

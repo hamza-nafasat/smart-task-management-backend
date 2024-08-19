@@ -21,6 +21,7 @@ export const sendMail = async (to, subject, text, html = false) => {
       text: html ? undefined : text,
       html: html ? text : undefined,
     });
+    console.log("email sended successfully");
     return true;
   } catch (error) {
     console.log("error while sending mail", error);
