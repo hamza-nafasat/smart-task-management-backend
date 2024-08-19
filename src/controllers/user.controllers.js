@@ -9,6 +9,7 @@ import CustomError from "../utils/customError.js";
 import Task from "../models/task.model.js";
 import dotenv from "../config/dotenv.js";
 import { returnWelcomeMessage } from "../config/constants.js";
+import XLSX from "xlsx";
 
 // register a new user
 // -------------------
@@ -75,7 +76,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
 const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
   const file = req.file;
   if (!file) return next(new CustomError(400, "Please provide a file"));
-  const workbook = XLSX.readFile(file.path);
+  const workbook = XLSX.read(file.buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
   const worksheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
@@ -83,47 +84,47 @@ const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
   const existingUsers = [];
   const errors = [];
 
+  const hashPassword = await bcrypt.hash("12345678", 10);
+
   for (const row of worksheet) {
     // Check if all required fields are present
     if (!row.name || !row.username || !row.email || !row.gender || !row.position) {
       errors.push(`Missing fields in row: ${JSON.stringify(row)}`);
       continue;
     }
-
     // Validate username
     const usernameRegex = /^[a-z0-9]+$/;
     if (!usernameRegex.test(row.username)) {
       errors.push(`Invalid username in row: ${JSON.stringify(row)}`);
       continue;
     }
-
     // Check if the username or email already exists in the database
     const existingUser = await User.findOne({
       $or: [{ username: row.username }, { email: row.email }],
     });
-
     if (existingUser) {
       existingUsers.push(existingUser);
       continue;
     }
-
     // Prepare user object for insertion
     usersToInsert.push({
       name: row.name,
       username: row.username,
       email: row.email,
-      gender: row.gender,
+      gender: row.gender?.toLowerCase(),
       position: row.position,
+      password: hashPassword,
     });
   }
-
   // Insert valid users into the database
   const insertedUsers = await User.insertMany(usersToInsert);
-
+  const message = `Successfully inserted ${insertedUsers.length || 0} users. ${
+    existingUsers.length || 0
+  } users already exist.`;
   // Send response
   res.status(200).json({
     success: true,
-    message: "File processed successfully!",
+    message: message,
     insertedUsersCount: insertedUsers.length,
     existingUsersCount: existingUsers.length,
     errors,
@@ -164,6 +165,10 @@ const deleteUser = asyncHandler(async (req, res, next) => {
   if (!user) return next(new CustomError(404, "User not found"));
   const deletedUser = await User.findByIdAndDelete(userId);
   if (!deletedUser) return next(new CustomError(404, "User not found"));
+  // remove user image if exist
+  if (user?.image?.public_id) {
+    await removeFromCloudinary(user.image.public_id, "auto");
+  }
   res.status(200).json({
     success: true,
     message: "User deleted successfully",
@@ -197,10 +202,8 @@ const editUser = asyncHandler(async (req, res, next) => {
   if (position) user.position = position;
   if (role) user.role = role;
   if (file) {
-    const remove = await removeFromCloudinary(user.image.public_id);
-    if (!remove) {
-      console.log("Error while removing image from cloudinary");
-    }
+    const remove = await removeFromCloudinary(user?.image?.public_id);
+    if (!remove) console.log("Error while removing image from cloudinary");
     const myCloud = await uploadOnCloudinary(file, "users", "image");
     if (!myCloud?.public_id || !myCloud?.secure_url) {
       return next(createHttpError(400, "Error While Uploading User Image on Cloudinary"));
