@@ -76,39 +76,48 @@ const registerUser = asyncHandler(async (req, res, next) => {
 const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
   const file = req.file;
   if (!file) return next(new CustomError(400, "Please provide a file"));
+
   const workbook = XLSX.read(file.buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
   const worksheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
   const usersToInsert = [];
-  const existingUsers = [];
   const errors = [];
-  const emailErrors = []; // Store emails with errors
-  const successfulEmails = []; // Store successful email responses
+  const emailErrors = [];
+  const successfulEmails = [];
+  const usernames = new Set();
+  const emails = new Set();
+
+  // Prepare for existing user checks
+  for (const row of worksheet) {
+    if (row.username) usernames.add(row.username);
+    if (row.email) emails.add(row.email);
+  }
+
+  const existingUsers = await User.find({
+    $or: [{ username: { $in: Array.from(usernames) } }, { email: { $in: Array.from(emails) } }],
+  });
+
+  const existingUsernames = new Set(existingUsers.map((user) => user.username));
+  const existingEmails = new Set(existingUsers.map((user) => user.email));
 
   const hashPassword = await bcrypt.hash("12345678", 10);
 
+  // Process worksheet data
   for (const row of worksheet) {
     // Check if all required fields are present
     if (!row.name || !row.username || !row.email || !row.gender || !row.position) {
       errors.push(`Missing fields in row: ${JSON.stringify(row)}`);
       continue;
     }
-
     // Validate username
     const usernameRegex = /^[a-z0-9]+$/;
     if (!usernameRegex.test(row.username)) {
       errors.push(`Invalid username in row: ${JSON.stringify(row)}`);
       continue;
     }
-
-    // Check if the username or email already exists in the database
-    const existingUser = await User.findOne({
-      $or: [{ username: row.username }, { email: row.email }],
-    });
-
-    if (existingUser) {
-      existingUsers.push(existingUser);
+    // Skip existing users
+    if (existingUsernames.has(row.username) || existingEmails.has(row.email)) {
       continue;
     }
 
@@ -121,28 +130,23 @@ const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
       position: row.position,
       password: hashPassword,
     });
-
-    // Send email to the user
-    const emailSent = await sendMail(
-      row.email,
-      "Welcome!",
-      returnWelcomeMessage(row.name, dotenv("FRONTEND_URL"))
-    );
-
-    if (!emailSent) {
-      emailErrors.push(`Failed to send email to ${row.email}`);
-    } else {
-      successfulEmails.push(row.email);
-    }
   }
 
   // Insert valid users into the database
   const insertedUsers = await User.insertMany(usersToInsert);
+
+  // Send emails in parallel for the inserted users
+  const emailPromises = insertedUsers.map((user) =>
+    sendMail(user.email, "Welcome!", returnWelcomeMessage(user.name, dotenv("FRONTEND_URL")))
+      .then(() => successfulEmails.push(user.email))
+      .catch(() => emailErrors.push(`Failed to send email to ${user.email}`))
+  );
+
+  await Promise.all(emailPromises);
+
   const message = `Successfully inserted ${insertedUsers.length || 0} users. ${
     existingUsers.length || 0
-  } users already exist.`;
-  if (emailErrors.length > 0)
-    message += ` ${emailErrors.length} emails failed to send. bcz thy are not valid.`;
+  } users already exist. ${emailErrors.length > 0 ? `${emailErrors.length} emails failed to send.` : ""}`;
 
   // Send success response
   res.status(200).json({
@@ -151,6 +155,7 @@ const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
     insertedUsersCount: insertedUsers.length,
     existingUsersCount: existingUsers.length,
     emailErrors,
+    successfulEmailsCount: successfulEmails.length,
   });
 });
 
