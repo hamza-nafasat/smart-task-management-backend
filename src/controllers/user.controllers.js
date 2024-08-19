@@ -83,6 +83,8 @@ const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
   const usersToInsert = [];
   const existingUsers = [];
   const errors = [];
+  const emailErrors = []; // Store emails with errors
+  const successfulEmails = []; // Store successful email responses
 
   const hashPassword = await bcrypt.hash("12345678", 10);
 
@@ -92,20 +94,24 @@ const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
       errors.push(`Missing fields in row: ${JSON.stringify(row)}`);
       continue;
     }
+
     // Validate username
     const usernameRegex = /^[a-z0-9]+$/;
     if (!usernameRegex.test(row.username)) {
       errors.push(`Invalid username in row: ${JSON.stringify(row)}`);
       continue;
     }
+
     // Check if the username or email already exists in the database
     const existingUser = await User.findOne({
       $or: [{ username: row.username }, { email: row.email }],
     });
+
     if (existingUser) {
       existingUsers.push(existingUser);
       continue;
     }
+
     // Prepare user object for insertion
     usersToInsert.push({
       name: row.name,
@@ -115,21 +121,39 @@ const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
       position: row.position,
       password: hashPassword,
     });
+
+    // Send email to the user
+    const emailSent = await sendMail(
+      row.email,
+      "Welcome!",
+      returnWelcomeMessage(row.name, dotenv("FRONTEND_URL"))
+    );
+
+    if (!emailSent) {
+      emailErrors.push(`Failed to send email to ${row.email}`);
+    } else {
+      successfulEmails.push(row.email);
+    }
   }
+
   // Insert valid users into the database
   const insertedUsers = await User.insertMany(usersToInsert);
   const message = `Successfully inserted ${insertedUsers.length || 0} users. ${
     existingUsers.length || 0
   } users already exist.`;
-  // Send response
+  if (emailErrors.length > 0)
+    message += ` ${emailErrors.length} emails failed to send. bcz thy are not valid.`;
+
+  // Send success response
   res.status(200).json({
     success: true,
     message: message,
     insertedUsersCount: insertedUsers.length,
     existingUsersCount: existingUsers.length,
-    errors,
+    emailErrors,
   });
 });
+
 //  get all users
 // ---------------
 const getAllUsers = asyncHandler(async (req, res, next) => {
