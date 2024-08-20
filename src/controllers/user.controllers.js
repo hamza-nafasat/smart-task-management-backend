@@ -14,10 +14,10 @@ import XLSX from "xlsx";
 // register a new user
 // -------------------
 const registerUser = asyncHandler(async (req, res, next) => {
-  const { name, username, email, password, gender, position } = req.body;
+  const { name, username, email, password, position } = req.body;
   const image = req.file;
   if (!image) return next(new CustomError(400, "Please provide a profile image"));
-  if (!name || !username || !email || !password || !gender || !position) {
+  if (!name || !username || !email || !password || !position) {
     return next(new CustomError(400, "All fields are required"));
   }
   const usernameRegex = /^[a-z0-9]+$/;
@@ -55,7 +55,6 @@ const registerUser = asyncHandler(async (req, res, next) => {
     name,
     email,
     password: hashedPassword,
-    gender,
     position,
     username,
     image: {
@@ -106,7 +105,7 @@ const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
   // Process worksheet data
   for (const row of worksheet) {
     // Check if all required fields are present
-    if (!row.name || !row.username || !row.email || !row.gender || !row.position) {
+    if (!row.name || !row.username || !row.email || !row.position) {
       errors.push(`Missing fields in row: ${JSON.stringify(row)}`);
       continue;
     }
@@ -126,7 +125,6 @@ const registerUsersFromExcelFile = asyncHandler(async (req, res, next) => {
       name: row.name,
       username: row.username,
       email: row.email,
-      gender: row.gender?.toLowerCase(),
       position: row.position,
       password: hashPassword,
     });
@@ -209,8 +207,8 @@ const deleteUser = asyncHandler(async (req, res, next) => {
 const editUser = asyncHandler(async (req, res, next) => {
   const userId = req.params.userId;
   const file = req.file;
-  const { name, username, email, password, gender, position, role } = req.body;
-  if (!name && !username && !email && !password && !gender && !position && !file && !role) {
+  const { name, username, email, password, position, role } = req.body;
+  if (!name && !username && !email && !password && !position && !file && !role) {
     return next(new CustomError(400, "Please provide at least one field"));
   }
   let isUsernameExist;
@@ -227,7 +225,6 @@ const editUser = asyncHandler(async (req, res, next) => {
   if (name) user.name = name;
   if (username) user.username = username;
   if (password) user.password = hashedPassword;
-  if (gender) user.gender = gender;
   if (position) user.position = position;
   if (role) user.role = role;
   if (file) {
@@ -346,8 +343,8 @@ const getMyProfile = asyncHandler(async (req, res, next) => {
 const updateMyProfile = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
   const file = req.file;
-  const { name, username, email, password, gender, position } = req.body;
-  if (!name && !username && !email && !password && !gender && !position && !file) {
+  const { name, username, email, password, position } = req.body;
+  if (!name && !username && !email && !password && !position && !file) {
     return next(new CustomError(400, "Please provide at least one field"));
   }
   let isUsernameExist;
@@ -364,7 +361,6 @@ const updateMyProfile = asyncHandler(async (req, res, next) => {
   if (name) user.name = name;
   if (username) user.username = username;
   if (password) user.password = hashedPassword;
-  if (gender) user.gender = gender;
   if (position) user.position = position;
   if (file) {
     const remove = await removeFromCloudinary(user.image.public_id);
@@ -473,9 +469,7 @@ const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
   if (isNaN(rating)) rating = 0.0;
   // checking that how much 1 and how much 2 in this feedback array ===++==++==
   const groupedArrays = feedbackArr.reduce((acc, val) => {
-    if (!acc[val]) {
-      acc[val] = [];
-    }
+    if (!acc[val]) acc[val] = [];
     acc[val].push(val);
     return acc;
   }, {});
