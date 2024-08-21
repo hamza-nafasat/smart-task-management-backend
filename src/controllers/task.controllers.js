@@ -7,6 +7,7 @@ import Comment from "../models/comment.model.js";
 import User from "../models/user.model.js";
 import { createActivity } from "../utils/activities.js";
 import Activity from "../models/activity.model.js";
+import { createNotification } from "./notification.controller.js";
 
 // create new task
 // ---------------
@@ -91,6 +92,16 @@ const createTask = asyncHandler(async (req, res, next) => {
     user.tasks.push(newTask._id);
     await user.save();
   }
+
+  // send notifications to all assignees
+  if (newTask.assignee?.length > 0) {
+    await createNotification(
+      "Task Assigned",
+      `A new task has been created by ${userName.toUpperCase()}`,
+      userId,
+      newTask.assignee
+    );
+  }
   res.status(201).json({
     success: true,
     message: "Task created successfully",
@@ -127,6 +138,10 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   const task = await Task.findById(taskId);
   if (!task) return next(new CustomError(404, "Task not found"));
   let oldTask = structuredClone(task.toObject());
+  oldTask.assignee = [];
+  task.assignee.forEach((element) => {
+    oldTask.assignee.push(String(element));
+  });
   if (String(task.creator) !== String(userId)) return next(new CustomError(403, "You are Not authorized"));
   // update fields
   if (assignee) task.assignee = assignee;
@@ -162,7 +177,6 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
   task.attachments.push(...myClouds);
 
   // add activities in task
-
   // title
   if (title && oldTask.title != title) {
     const activity = await createActivity({
@@ -220,6 +234,42 @@ const updateSingleTask = asyncHandler(async (req, res, next) => {
       type: "task",
     });
     if (!activity) return next(new CustomError(500, "Failed to create activity"));
+  }
+
+  // send notifications if new assignees added
+  if (assignee && typeof assignee == "object" && assignee.length > oldTask.assignee.length) {
+    const newAssignees = [];
+    assignee.forEach((id) => {
+      if (!oldTask.assignee.includes(String(id))) {
+        newAssignees.push(String(id));
+      }
+    });
+    if (newAssignees.length > 0) {
+      await createNotification(
+        "Task Assigned",
+        `You are added in new task as a assignee`,
+        task.creator,
+        newAssignees
+      );
+    }
+  }
+
+  // send notifications if any assignee removed
+  if (assignee && typeof assignee == "object" && assignee.length < oldTask.assignee.length) {
+    const removedAssignees = [];
+    oldTask.assignee.forEach((id) => {
+      if (!assignee.includes(String(id))) {
+        removedAssignees.push(String(id));
+      }
+    });
+    if (removedAssignees.length > 0) {
+      await createNotification(
+        "Removed From Task",
+        "You are removed from task as a assignee",
+        task.creator,
+        removedAssignees
+      );
+    }
   }
 
   const updatedTask = await task.save();
@@ -281,6 +331,15 @@ const submitTask = asyncHandler(async (req, res, next) => {
     }),
   ]);
   if (!activity1 || !activity2) return next(new CustomError(500, "Failed to create Submit activity"));
+
+  // send notification to creator
+  await createNotification(
+    "Feedback Sent To You",
+    "Feedback sent to you as a creator of this task by assignees after submission.",
+    userId,
+    [task.creator]
+  );
+
   res.status(200).json({
     success: true,
     message: "Task submitted successfully",
@@ -306,6 +365,8 @@ const completeTask = asyncHandler(async (req, res, next) => {
     { $push: { feedback: { feedback: feedback, task: taskId, from: userId } } },
     { new: true }
   );
+  if (!updateUsers.modifiedCount)
+    return next(new CustomError(500, "Failed to update task while complete the task"));
   const updatedTask = await task.save();
   if (!updatedTask) return next(new CustomError(500, "Failed to update task"));
   // create activity
@@ -326,6 +387,14 @@ const completeTask = asyncHandler(async (req, res, next) => {
     }),
   ]);
   if (!activity1 || !activity2) return next(new CustomError(500, "Failed to create Submit activity"));
+
+  // sent notification to assignees of this task
+  await createNotification(
+    "Feedback Sent To You",
+    "Feedback sent to you form creator as a member of this task after completion.",
+    userId,
+    task.assignee
+  );
   res.status(200).json({
     success: true,
     message: "Task completed successfully",

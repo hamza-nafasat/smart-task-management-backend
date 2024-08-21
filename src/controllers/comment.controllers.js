@@ -3,6 +3,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import Comment from "../models/comment.model.js";
 import Task from "../models/task.model.js";
 import { createActivity } from "../utils/activities.js";
+import { createNotification } from "./notification.controller.js";
 
 // create new comment
 // ------------------
@@ -22,6 +23,7 @@ const createComment = asyncHandler(async (req, res, next) => {
   if (!newComment) return next(new CustomError(500, "Failed to create comment"));
 
   const task = await Task.findById(taskId);
+  if (!task) return next(new CustomError(404, "Task not found"));
   task.commentsCount = task.commentsCount ? task.commentsCount + 1 : 1;
   await task.save();
 
@@ -34,6 +36,14 @@ const createComment = asyncHandler(async (req, res, next) => {
     type: "comment",
   });
   if (!activity) return next(new CustomError(500, "Failed to create activity"));
+
+  // sent notification to user who created
+  await createNotification(
+    "Comment Added",
+    ` ${userName?.toUpperCase()} added one comment [${content}] to this task.`,
+    userId,
+    [task.creator]
+  );
 
   res.status(201).json({
     success: true,

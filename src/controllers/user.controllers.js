@@ -452,10 +452,84 @@ const resetPassword = asyncHandler(async (req, res, next) => {
 // -------------------------
 const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
   const { userId } = req.params;
-  const user = await User.findById(userId).select("-password").populate("tasks").populate({
+  const { userDetailsDate } = req.query;
+  console.log(userDetailsDate);
+  let user = await User.findById(userId).select("-password").populate("tasks").populate({
     path: "feedback.task",
     select: "status",
   });
+  let taskData = { $or: [{ creator: userId }, { assignee: userId }] };
+
+  // change data for weekly
+  if (userDetailsDate && userDetailsDate == "week") {
+    const lastWeekDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    taskData = {
+      $or: [{ creator: userId }, { assignee: userId }],
+      createdAt: { $gte: lastWeekDate },
+    };
+    user.tasks = user.tasks?.filter((task) => {
+      const taskDate = new Date(task.createdAt);
+      const oneDay = 24 * 60 * 60 * 1000;
+      const diffDays = Math.round(Math.abs((taskDate - userDetailsDate) / oneDay));
+      console.log("i am running weekly");
+      return diffDays <= 7;
+    });
+    user.feedback = user.feedback?.filter((feed) => {
+      const feedDate = new Date(feed.task.createdAt);
+      const oneDay = 24 * 60 * 60 * 1000;
+      const diffDays = Math.round(Math.abs((feedDate - userDetailsDate) / oneDay));
+      console.log("i am running monthly");
+      return diffDays <= 7;
+    });
+  }
+  // change data for monthly
+  if (userDetailsDate && userDetailsDate == "month") {
+    const lastMonthDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    taskData = {
+      $or: [{ creator: userId }, { assignee: userId }],
+      createdAt: { $gte: lastMonthDate },
+    };
+    user.tasks = user.tasks?.filter((task) => {
+      const taskDate = new Date(task.createdAt);
+      const oneDay = 24 * 60 * 60 * 1000;
+      const diffDays = Math.round(Math.abs((taskDate - userDetailsDate) / oneDay));
+      console.log("i am running yearly");
+      return diffDays <= 30;
+    });
+    user.feedback = user.feedback?.filter((feed) => {
+      const feedDate = new Date(feed.task.createdAt);
+      const oneDay = 24 * 60 * 60 * 1000;
+      const diffDays = Math.round(Math.abs((feedDate - userDetailsDate) / oneDay));
+      return diffDays <= 30;
+    });
+  }
+  // change data for yearly
+  if (userDetailsDate && userDetailsDate == "year") {
+    const lastYearDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    taskData = {
+      $or: [{ creator: userId }, { assignee: userId }],
+      createdAt: { $gte: lastYearDate },
+    };
+    user.tasks = user.tasks?.filter((task) => {
+      const taskDate = new Date(task.createdAt);
+      const oneDay = 24 * 60 * 60 * 1000;
+      const diffDays = Math.round(Math.abs((taskDate - userDetailsDate) / oneDay));
+      return diffDays <= 365;
+    });
+    user.feedback = user.feedback?.filter((feed) => {
+      const feedDate = new Date(feed.task.createdAt);
+      const oneDay = 24 * 60 * 60 * 1000;
+      const diffDays = Math.round(Math.abs((feedDate - userDetailsDate) / oneDay));
+      return diffDays <= 365;
+    });
+  }
+
+  // fid tasks
+  const tasksOfUser = await Task.find(taskData).populate({
+    path: "creator",
+    select: "name",
+  });
+
   if (!user) return next(new CustomError(404, "User not found"));
   let feedbackArr = [];
   user.feedback?.forEach((feed) => {
@@ -486,13 +560,9 @@ const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
   const completedTasksFeedBackArray = [];
   const scheduledTasksFeedBackArray = [];
   user.feedback?.forEach((feed) => {
-    if (feed?.task?.status === "in-progress") {
-      inProgressTasksFeedBackArray.push(feed?.feedback);
-    } else if (feed?.task?.status === "completed") {
-      completedTasksFeedBackArray.push(feed?.feedback);
-    } else if (feed?.task?.status === "scheduled") {
-      scheduledTasksFeedBackArray.push(feed?.feedback);
-    }
+    if (feed?.task?.status === "in-progress") inProgressTasksFeedBackArray.push(feed?.feedback);
+    else if (feed?.task?.status === "completed") completedTasksFeedBackArray.push(feed?.feedback);
+    else if (feed?.task?.status === "scheduled") scheduledTasksFeedBackArray.push(feed?.feedback);
   });
 
   // Total number of accurate feedback items
@@ -513,12 +583,6 @@ const getSingleUserExtraDetails = asyncHandler(async (req, res, next) => {
     { label: "In Progress", value: isNaN(inProgressPercentage) ? 0 : inProgressPercentage.toFixed(1) },
     { label: "Schedule", value: isNaN(scheduledPercentage) ? 0 : scheduledPercentage.toFixed(1) },
   ];
-
-  // find all tasks where this user is assignee or creator
-  const tasksOfUser = await Task.find({ $or: [{ creator: userId }, { assignee: userId }] }).populate({
-    path: "creator",
-    select: "name",
-  });
 
   const modifiedTasksOfUser = tasksOfUser.map((task) => {
     return {

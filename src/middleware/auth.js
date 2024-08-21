@@ -27,10 +27,31 @@ const isAuthenticated = asyncHandler(async (req, res, next) => {
   next();
 });
 
+const isSocketAuth = asyncHandler(async (err, socket, next) => {
+  const accessToken = socket.request.cookies?.[getenv("ACCESS_TOKEN_NAME")];
+  let userId;
+  let user;
+  if (accessToken) userId = await tokenService().verifyAccessToken(accessToken);
+  if (!userId) {
+    // get new access and refresh token
+    const refreshToken = socket.request.cookies?.[getenv("REFRESH_TOKEN_NAME")];
+    if (!refreshToken) return next(new CustomError(400, "please Login again"));
+    userId = await tokenService().verifyRefreshToken(refreshToken);
+    user = await User.findById(userId).select("_id name role");
+    if (!user) return next(new CustomError(400, "please Login again"));
+  } else {
+    // validate user
+    user = await User.findById(userId).select("_id name role");
+    if (!user) return next(new CustomError(400, "please Login again"));
+  }
+  socket.user = user;
+  next();
+});
+
 const isAdmin = asyncHandler(async (req, res, next) => {
   const user = req.user;
   if (user.role !== "admin") return next(new CustomError(403, "You are not Authorized for this"));
   next();
 });
 
-export { isAuthenticated, isAdmin };
+export { isAuthenticated, isAdmin, isSocketAuth };

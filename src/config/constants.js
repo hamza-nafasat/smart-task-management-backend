@@ -1,3 +1,5 @@
+import { io } from "../app.js";
+
 const returnWelcomeMessage = (name, frontendUrl) => {
   const userWelcomePage = `<!DOCTYPE html>
   <html lang="en">
@@ -157,4 +159,16 @@ const returnWelcomeMessage = (name, frontendUrl) => {
   return userWelcomePage;
 };
 
-export { returnWelcomeMessage };
+const liveSockets = new Map();
+
+const socketEvent = {
+  SEND_NOTIFICATION: "SEND_NOTIFICATION",
+};
+
+const emitEvent = async (event, user, data) => {
+  const socketUser = await liveSockets.get(String(user));
+  console.log("emit data", data, event, socketUser, user);
+  io.to(socketUser).emit(event, data);
+};
+
+export { returnWelcomeMessage, liveSockets, socketEvent, emitEvent };

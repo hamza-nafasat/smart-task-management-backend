@@ -7,4 +7,5 @@ const createActivity = async ({ title, type, message, task, user }) => {
   if (!activity) return null;
   else return activity;
 };
+
 export { createActivity };

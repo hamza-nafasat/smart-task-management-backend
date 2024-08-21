@@ -23,6 +23,7 @@ const userSchema = new Schema(
         feedback: { type: String, required: true },
         from: { type: Schema.Types.ObjectId, ref: "User", required: true },
         task: { type: Schema.Types.ObjectId, ref: "Task", required: true },
+        createdAt: { type: Date, default: Date.now },
       },
     ],
   },
