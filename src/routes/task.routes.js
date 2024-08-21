@@ -23,7 +23,12 @@ import {
   updateCommentReply,
 } from "../controllers/comment.controllers.js";
 import { multipleUpload } from "../middleware/multer.js";
-import { getUnreadNotifications } from "../controllers/notification.controller.js";
+import {
+  deleteNotification,
+  getAllNotifications,
+  getUnreadNotifications,
+  readAllNotifications,
+} from "../controllers/notification.controller.js";
 
 const app = express();
 
@@ -75,6 +80,9 @@ app.get("/activities/all/:taskId", isAuthenticated, getSingleTaskActivities);
 app.get("/filter/all", isAuthenticated, filterAllTasks);
 
 // get all unread  notifications
-app.get("/get-unread-notifications/all", isAuthenticated, getUnreadNotifications);
+app.get("/unread-notifications/all", isAuthenticated, getUnreadNotifications);
+app.get("/all-notifications", isAuthenticated, getAllNotifications);
+app.get("/read-all-notifications", isAuthenticated, readAllNotifications);
+app.delete("/single-notification/:notificationId", isAuthenticated, deleteNotification);
 
 export default app;
