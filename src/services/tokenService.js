@@ -60,8 +60,18 @@ const tokenService = () => {
         const decodedToken = await jwt.verify(decryptedToken, getenv("REFRESH_TOKEN_SECRET"));
         let userId = decodedToken?.id;
         if (userId) {
-          const deleteOldToken = await Token.findOneAndDelete({ userId }, { token }, { new: true });
-          if (deleteOldToken) return userId;
+          let deleteOldToken;
+          try {
+            deleteOldToken = await Token.findOneAndDelete(
+              { userId },
+              { token: decryptedToken },
+              { new: true }
+            );
+            return userId;
+          } catch (error) {
+            console.log(error, "error while deleting old token");
+            return userId;
+          }
         } else return null;
       } catch (error) {
         console.log("error while verifying refresh token", error);

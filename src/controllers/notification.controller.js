@@ -43,7 +43,7 @@ const getUnreadNotifications = asyncHandler(async (req, res, next) => {
 // ----------------------
 const readAllNotifications = asyncHandler(async (req, res, next) => {
   const { _id: userId } = req.user;
-  const notifications = await Notification.updateMany({ to: userId, read: false }, { read: true });
+  await Notification.updateMany({ to: userId, read: false }, { read: true });
   res.status(200).json({
     success: true,
     data: "Notifications read successfully",

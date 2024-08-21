@@ -80,7 +80,7 @@ app.get("/activities/all/:taskId", isAuthenticated, getSingleTaskActivities);
 app.get("/filter/all", isAuthenticated, filterAllTasks);
 
 // get all unread  notifications
-app.get("/unread-notifications/all", isAuthenticated, getUnreadNotifications);
+app.get("/unread-notifications", isAuthenticated, getUnreadNotifications);
 app.get("/all-notifications", isAuthenticated, getAllNotifications);
 app.get("/read-all-notifications", isAuthenticated, readAllNotifications);
 app.delete("/single-notification/:notificationId", isAuthenticated, deleteNotification);

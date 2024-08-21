@@ -8,7 +8,8 @@ import customErrorHandler from "./middleware/errorHandler.js";
 import taskRoutes from "./routes/task.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import { isSocketAuth } from "./middleware/auth.js";
-import { liveSockets } from "./config/constants.js";
+import { emitEvent, liveSockets, socketEvent } from "./config/constants.js";
+import Notification from "./models/notification.modal.js";
 
 const app = express();
 
@@ -32,10 +33,9 @@ io.use(async (socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  console.log(" Socket connected successfully");
-  liveSockets.set(String(socket.user?._id), socket.id);
+  const userId = String(socket.user?._id);
+  liveSockets.set(userId, socket.id);
   console.log("liveSockets", liveSockets);
-
   socket.on("disconnect", () => {
     console.log("disconnected");
   });

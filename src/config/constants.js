@@ -167,7 +167,6 @@ const socketEvent = {
 
 const emitEvent = async (event, user, data) => {
   const socketUser = await liveSockets.get(String(user));
-  console.log("emit data", data, event, socketUser, user);
   io.to(socketUser).emit(event, data);
 };
 

@@ -27,7 +27,7 @@ const createComment = asyncHandler(async (req, res, next) => {
   if (!task) return next(new CustomError(404, "Task not found"));
   task.assignee?.forEach((user) => allUsersOfTask.push(String(user)));
   allUsersOfTask.push(task?.creator);
-  allUsersOfTask = allUsersOfTask.filter((user) => user !== String(userId));
+  allUsersOfTask = allUsersOfTask.filter((user) => String(user) !== String(userId));
 
   task.commentsCount = task.commentsCount ? task.commentsCount + 1 : 1;
   await task.save();

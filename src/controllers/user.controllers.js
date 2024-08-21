@@ -300,11 +300,11 @@ const logoutUser = asyncHandler(async (req, res, next) => {
   };
   res.cookie(getenv("ACCESS_TOKEN_NAME"), null, {
     ...options,
-    maxAge: Date.now(),
+    expiresIn: Date.now(),
   });
   res.cookie(getenv("REFRESH_TOKEN_NAME"), null, {
     ...options,
-    maxAge: Date.now(),
+    expiresIn: Date.now(),
   });
   res.status(200).json({
     success: true,
