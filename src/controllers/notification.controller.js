@@ -2,7 +2,7 @@ import Notification from "../models/notification.modal.js";
 import asyncHandler from "../utils/asyncHandler.js";
 
 // create new notification function
-// -------------------------------
+// --------------------------------
 const createNotification = async (title, description, from, to) => {
   if (!title) throw new Error("Title is required");
   if (!description) throw new Error("Description is required");
@@ -28,10 +28,12 @@ const createNotification = async (title, description, from, to) => {
 };
 
 // get all unread notifications action
-// ----------------------
+// -----------------------------------
 const getUnreadNotifications = asyncHandler(async (req, res, next) => {
   const { _id: userId } = req.user;
-  const notifications = await Notification.find({ to: userId, read: false }).populate("from");
+  const notifications = await Notification.find({ to: userId, read: false })
+    .populate("from")
+    .sort({ createdAt: -1 });
   res.status(200).json({
     success: true,
     data: notifications,

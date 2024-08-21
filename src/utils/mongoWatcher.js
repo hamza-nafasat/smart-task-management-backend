@@ -9,7 +9,9 @@ const notificationWatcher = () => {
     if (change.operationType === "insert") {
       const document = change.fullDocument;
       let toId = document?.to;
-      const allUnreadNotifications = await Notification.find({ to: toId, read: false }).populate("from");
+      const allUnreadNotifications = await Notification.find({ to: toId, read: false })
+        .populate("from")
+        .sort({ createdAt: -1 });
       await emitEvent(socketEvent.SEND_NOTIFICATION, toId, allUnreadNotifications);
     }
   });
