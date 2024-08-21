@@ -21,9 +21,14 @@ const createComment = asyncHandler(async (req, res, next) => {
     task: taskId,
   });
   if (!newComment) return next(new CustomError(500, "Failed to create comment"));
+  let allUsersOfTask = [];
 
   const task = await Task.findById(taskId);
   if (!task) return next(new CustomError(404, "Task not found"));
+  task.assignee?.forEach((user) => allUsersOfTask.push(String(user)));
+  allUsersOfTask.push(task?.creator);
+  allUsersOfTask = allUsersOfTask.filter((user) => user !== String(userId));
+
   task.commentsCount = task.commentsCount ? task.commentsCount + 1 : 1;
   await task.save();
 
@@ -42,7 +47,7 @@ const createComment = asyncHandler(async (req, res, next) => {
     "Comment Added",
     ` ${userName?.toUpperCase()} added one comment [${content}] to this task.`,
     userId,
-    [task.creator]
+    allUsersOfTask
   );
 
   res.status(201).json({
