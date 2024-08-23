@@ -3,13 +3,16 @@ import cors from "cors";
 import express from "express";
 import { createServer } from "http";
 import morgan from "morgan";
+import cron from "node-cron";
+import fs from "node:fs";
+import path from "node:path";
 import { Server } from "socket.io";
+import { liveSockets } from "./config/constants.js";
+import { isSocketAuth } from "./middleware/auth.js";
 import customErrorHandler from "./middleware/errorHandler.js";
 import taskRoutes from "./routes/task.routes.js";
 import userRoutes from "./routes/user.routes.js";
-import { isSocketAuth } from "./middleware/auth.js";
-import { emitEvent, liveSockets, socketEvent } from "./config/constants.js";
-import Notification from "./models/notification.modal.js";
+import getUsersAndGenerateDateAndSendmail, { userPdfPath } from "./utils/exportPdf.js";
 
 const app = express();
 
@@ -20,6 +23,23 @@ let corsOptions = {
   credentials: true,
   origin: ["http://localhost:5173", "https://smart-task-management-frontend.vercel.app"],
 };
+
+cron.schedule("50 09 * * *", async () => {
+  try {
+    await getUsersAndGenerateDateAndSendmail();
+    console.log("Emails sent successfully!");
+    fs.readdir(userPdfPath, (err, files) => {
+      if (err) throw err;
+      for (const file of files) {
+        fs.unlink(path.join(userPdfPath, file), (err) => {
+          if (err) throw err;
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error sending emails:", error);
+  }
+});
 
 app.use(cors(corsOptions));
 

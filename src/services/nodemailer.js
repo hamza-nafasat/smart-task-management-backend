@@ -28,3 +28,19 @@ export const sendMail = async (to, subject, text, html = false) => {
     return false;
   }
 };
+export const sendMailWithAttachments = async (to, subject, text, attachment) => {
+  try {
+    if (!to || !subject || !text) throw new Error("Please Provide To, Subject and Text");
+    const myTransPorter = transporter;
+    await myTransPorter.sendMail({
+      from: getenv("NODEMAILER_FROM"),
+      to,
+      subject,
+      text,
+      attachments: attachment,
+    });
+    return true;
+  } catch (error) {
+    console.log("error while sending file on mail", error);
+  }
+};
